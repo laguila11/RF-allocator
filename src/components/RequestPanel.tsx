@@ -103,22 +103,6 @@ export function RequestPanel({
         )}
       </div>
 
-      {/* Color legend */}
-      <div style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-        <div style={{ color: '#94a3b8', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Color = Venue</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {venues.map(v => {
-            const svcId = selectedServiceId !== 'all' ? selectedServiceId : 'svc-wmic';
-            const sampleReq = v.requests.find(r => r.serviceId === svcId) ?? v.requests[0];
-            return (
-              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: sampleReq?.color ?? '#94a3b8', flexShrink: 0 }} />
-                <span style={{ color: '#64748b', fontSize: '11px' }}>{v.name}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

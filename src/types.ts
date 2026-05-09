@@ -50,6 +50,13 @@ export interface Reservation {
   reason: string;
 }
 
+export interface BandGridParams {
+  numCols: number;
+  cellHeightPx: number;
+  channelMHz: number; // display cell width in MHz (may be > band.channelMHz when cells are capped)
+  numCells: number;
+}
+
 export interface DragPreview {
   bandId: string;
   startMHz: number;

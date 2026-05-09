@@ -7,9 +7,9 @@ import { RequestCard } from './components/RequestCard';
 import { ReserveDialog } from './components/ReserveDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { initialBands, venues, allRequests, services } from './data';
-import type { Allocation, DragPreview, FrequencyRequest, PendingReserve, Reservation } from './types';
+import type { Allocation, BandGridParams, DragPreview, FrequencyRequest, PendingReserve, Reservation } from './types';
 
-const DEFAULT_SNAP_MHZ = 0.006;
+const DEFAULT_SNAP_MHZ = 0.00625;
 
 interface ConfirmState {
   title: string;
@@ -37,6 +37,7 @@ export default function App() {
   const pointerXRef = useRef(0);
   const pointerYRef = useRef(0);
   const bandStripRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const bandGridParams = useRef<Map<string, BandGridParams>>(new Map());
   const tooltipElRef = useRef<HTMLDivElement | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -66,13 +67,32 @@ export default function App() {
     else bandStripRefs.current.delete(bandId);
   }, []);
 
+  const registerBandGrid = useCallback((bandId: string, params: BandGridParams | null) => {
+    if (params) bandGridParams.current.set(bandId, params);
+    else bandGridParams.current.delete(bandId);
+  }, []);
+
   const calcDropPosition = useCallback((bandId: string, req: FrequencyRequest) => {
     const band = initialBands.find(b => b.id === bandId);
     const stripEl = bandStripRefs.current.get(bandId);
     if (!band || !stripEl) return null;
     const rect = stripEl.getBoundingClientRect();
-    const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width));
-    const rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+    const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width - 1));
+    const relY = Math.max(0, Math.min(pointerYRef.current - rect.top, rect.height - 1));
+
+    let rawFreq: number;
+    const gp = bandGridParams.current.get(bandId);
+    if (gp && gp.numCols > 0) {
+      const cellW = rect.width / gp.numCols;
+      const numRows = Math.ceil(gp.numCells / gp.numCols);
+      const col = Math.min(Math.floor(relX / cellW), gp.numCols - 1);
+      const row = Math.min(Math.floor(relY / (gp.cellHeightPx + 1)), numRows - 1);
+      const cellIdx = Math.min(row * gp.numCols + col, gp.numCells - 1);
+      rawFreq = band.startMHz + cellIdx * gp.channelMHz;
+    } else {
+      rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+    }
+
     const snapMHz = band.snapMHz ?? DEFAULT_SNAP_MHZ;
     const maxStart = req.duplexOffsetMHz !== undefined
       ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
@@ -302,11 +322,11 @@ export default function App() {
             allRequests={allRequests}
             allocations={allocations}
             reservations={reservations}
-            venues={venues}
             dragPreview={dragPreview}
             onDeallocate={handleDeallocate}
             onRemoveReservation={handleRemoveReservation}
             onRegisterStrip={registerBandStrip}
+            onRegisterGrid={registerBandGrid}
             onReserveRequest={handleReserveRequest}
           />
           <RequestPanel

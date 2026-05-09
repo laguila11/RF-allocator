@@ -1,33 +1,5 @@
 import type { FrequencyBand, Service, Venue } from './types';
 
-// ─── Venue × Service color matrix ─────────────────────────────────────────────
-// Dark shades = Opening Ceremony, medium = Athletics, light = IBC/Media.
-// White label text is readable on all values chosen (L ≤ 58% in HSL).
-// ─────────────────────────────────────────────────────────────────────────────
-const VENUE_SERVICE_COLOR: Record<string, Record<string, string>> = {
-  'opening-ceremony': {
-    'svc-plmr':    '#15803d', 'svc-telem':   '#0e7490', 'svc-intercom': '#065f46',
-    'svc-cam':     '#b45309', 'svc-wmic':    '#1e40af', 'svc-iem':      '#6d28d9',
-    'svc-earth':   '#86198f', 'svc-mmlink':  '#be123c', 'svc-ptp':      '#7f1d1d',
-    'svc-wlan':    '#3730a3', 'svc-photo':   '#334155', 'svc-other':    '#374151',
-  },
-  'athletics': {
-    'svc-plmr':    '#16a34a', 'svc-telem':   '#0891b2', 'svc-intercom': '#059669',
-    'svc-cam':     '#d97706', 'svc-wmic':    '#2563eb', 'svc-iem':      '#7c3aed',
-    'svc-earth':   '#c026d3', 'svc-mmlink':  '#e11d48', 'svc-ptp':      '#b91c1c',
-    'svc-wlan':    '#4338ca', 'svc-photo':   '#475569', 'svc-other':    '#6b7280',
-  },
-  'ibc-media': {
-    'svc-plmr':    '#22c55e', 'svc-telem':   '#06b6d4', 'svc-intercom': '#10b981',
-    'svc-cam':     '#f59e0b', 'svc-wmic':    '#3b82f6', 'svc-iem':      '#8b5cf6',
-    'svc-earth':   '#d946ef', 'svc-mmlink':  '#f43f5e', 'svc-ptp':      '#ef4444',
-    'svc-wlan':    '#6366f1', 'svc-photo':   '#64748b', 'svc-other':    '#94a3b8',
-  },
-};
-
-export function getRequestColor(venueId: string, serviceId: string): string {
-  return VENUE_SERVICE_COLOR[venueId]?.[serviceId] ?? '#94a3b8';
-}
 
 // ─── Frequency bands ─────────────────────────────────────────────────────────
 // Sourced from LA28 Spectrum Availability Plan v1.1 (2025-10-22).
@@ -99,12 +71,10 @@ export const services: Service[] = [
   { id: 'svc-other',   name: '3.12 Other Services',                            color: '#6b7280', bandIds: ['fm-other'] },
 ];
 
-// ─── Venue × Service request colors (shorthand) ──────────────────────────────
-const OC  = VENUE_SERVICE_COLOR['opening-ceremony'];
-const ATH = VENUE_SERVICE_COLOR['athletics'];
-const IBC = VENUE_SERVICE_COLOR['ibc-media'];
-
 // ─── Venues & requests ───────────────────────────────────────────────────────
+// All requests of the same service share the service color regardless of venue.
+const C = Object.fromEntries(services.map(s => [s.id, s.color]));
+
 // Channel bandwidths per LA28 tables:
 //   §3.5/3.6 Mics/IEM    → 0.200 MHz (Tables 6 & 7)
 //   §3.3 Intercom (PLMR) → 0.200 MHz (Table 4, 12.5 kHz actual, displayed wider)
@@ -128,31 +98,31 @@ export const venues: Venue[] = [
     name: 'Opening Ceremony',
     requests: [
       // §3.5 Wireless Mics
-      { id: 'oc-mic-01', label: 'MIC-01', device: 'Shure Axient Digital AXT200',      bandwidthMHz: 0.2,   color: OC['svc-wmic'],    serviceId: 'svc-wmic' },
-      { id: 'oc-mic-02', label: 'MIC-02', device: 'Shure Axient Digital AXT200',      bandwidthMHz: 0.2,   color: OC['svc-wmic'],    serviceId: 'svc-wmic' },
-      { id: 'oc-mic-03', label: 'MIC-03', device: 'Sennheiser Digital 6000',           bandwidthMHz: 0.2,   color: OC['svc-wmic'],    serviceId: 'svc-wmic' },
-      { id: 'oc-mic-04', label: 'MIC-04', device: 'Sennheiser Digital 6000',           bandwidthMHz: 0.2,   color: OC['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'oc-mic-01', label: 'MIC-01', device: 'Shure Axient Digital AXT200',      bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'oc-mic-02', label: 'MIC-02', device: 'Shure Axient Digital AXT200',      bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'oc-mic-03', label: 'MIC-03', device: 'Sennheiser Digital 6000',           bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'oc-mic-04', label: 'MIC-04', device: 'Sennheiser Digital 6000',           bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
       // §3.6 IEM
-      { id: 'oc-iem-01', label: 'IEM-01', device: 'Shure PSM1000',                    bandwidthMHz: 0.2,   color: OC['svc-iem'],     serviceId: 'svc-iem' },
-      { id: 'oc-iem-02', label: 'IEM-02', device: 'Shure PSM1000',                    bandwidthMHz: 0.2,   color: OC['svc-iem'],     serviceId: 'svc-iem' },
-      { id: 'oc-iem-03', label: 'IEM-03', device: 'Sennheiser SR 2050 IEM',           bandwidthMHz: 0.2,   color: OC['svc-iem'],     serviceId: 'svc-iem' },
+      { id: 'oc-iem-01', label: 'IEM-01', device: 'Shure PSM1000',                    bandwidthMHz: 0.2,   color: C['svc-iem'],     serviceId: 'svc-iem' },
+      { id: 'oc-iem-02', label: 'IEM-02', device: 'Shure PSM1000',                    bandwidthMHz: 0.2,   color: C['svc-iem'],     serviceId: 'svc-iem' },
+      { id: 'oc-iem-03', label: 'IEM-03', device: 'Sennheiser SR 2050 IEM',           bandwidthMHz: 0.2,   color: C['svc-iem'],     serviceId: 'svc-iem' },
       // §3.3 Audio Intercom — 5 MHz UHF duplex (§3.1.3); place in uhf-prod
-      { id: 'oc-com-01', label: 'COM-01', device: 'Riedel Artist 32 (PLMR)',          bandwidthMHz: 0.2,   color: OC['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
-      { id: 'oc-com-02', label: 'COM-02', device: 'Clear-Com FreeSpeak Edge',         bandwidthMHz: 0.2,   color: OC['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
+      { id: 'oc-com-01', label: 'COM-01', device: 'Riedel Artist 32 (PLMR)',          bandwidthMHz: 0.2,   color: C['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
+      { id: 'oc-com-02', label: 'COM-02', device: 'Clear-Com FreeSpeak Edge',         bandwidthMHz: 0.2,   color: C['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
       // §3.1 PLMR simplex — place in uhf-prod or vhf-hi
-      { id: 'oc-pmr-01', label: 'PMR-01', device: 'Motorola MOTOTRBO SL300',          bandwidthMHz: 0.2,   color: OC['svc-plmr'],    serviceId: 'svc-plmr' },
-      { id: 'oc-pmr-02', label: 'PMR-02', device: 'Motorola MOTOTRBO SL300',          bandwidthMHz: 0.2,   color: OC['svc-plmr'],    serviceId: 'svc-plmr' },
+      { id: 'oc-pmr-01', label: 'PMR-01', device: 'Motorola MOTOTRBO SL300',          bandwidthMHz: 0.2,   color: C['svc-plmr'],    serviceId: 'svc-plmr' },
+      { id: 'oc-pmr-02', label: 'PMR-02', device: 'Motorola MOTOTRBO SL300',          bandwidthMHz: 0.2,   color: C['svc-plmr'],    serviceId: 'svc-plmr' },
       // §3.4 Wireless Camera — L-Band, 8 MHz/channel
-      { id: 'oc-cam-01', label: 'CAM-01', device: 'Vislink HCAM-S L-Band',            bandwidthMHz: 8.0,   color: OC['svc-cam'],     serviceId: 'svc-cam' },
-      { id: 'oc-cam-02', label: 'CAM-02', device: 'Vislink HCAM-S L-Band',            bandwidthMHz: 8.0,   color: OC['svc-cam'],     serviceId: 'svc-cam' },
+      { id: 'oc-cam-01', label: 'CAM-01', device: 'Vislink HCAM-S L-Band',            bandwidthMHz: 8.0,   color: C['svc-cam'],     serviceId: 'svc-cam' },
+      { id: 'oc-cam-02', label: 'CAM-02', device: 'Vislink HCAM-S L-Band',            bandwidthMHz: 8.0,   color: C['svc-cam'],     serviceId: 'svc-cam' },
       // §3.7 Earth Stations
-      { id: 'oc-sat-01', label: 'SAT-01', device: 'Comtech SNG Uplink Terminal',      bandwidthMHz: 3.0,   color: OC['svc-earth'],   serviceId: 'svc-earth' },
+      { id: 'oc-sat-01', label: 'SAT-01', device: 'Comtech SNG Uplink Terminal',      bandwidthMHz: 3.0,   color: C['svc-earth'],   serviceId: 'svc-earth' },
       // §3.8 Microwave Mobile Links
-      { id: 'oc-mwl-01', label: 'MWL-01', device: 'Ericsson MINI-LINK 6352 (OB van)', bandwidthMHz: 28.0,  color: OC['svc-mmlink'],  serviceId: 'svc-mmlink' },
+      { id: 'oc-mwl-01', label: 'MWL-01', device: 'Ericsson MINI-LINK 6352 (OB van)', bandwidthMHz: 28.0,  color: C['svc-mmlink'],  serviceId: 'svc-mmlink' },
       // §3.10 WLAN
-      { id: 'oc-wlan-01', label: 'AP-01', device: 'Cisco Catalyst 9136 (5 GHz)',      bandwidthMHz: 80.0,  color: OC['svc-wlan'],    serviceId: 'svc-wlan' },
+      { id: 'oc-wlan-01', label: 'AP-01', device: 'Cisco Catalyst 9136 (5 GHz)',      bandwidthMHz: 80.0,  color: C['svc-wlan'],    serviceId: 'svc-wlan' },
       // §3.12 FM mass-cast
-      { id: 'oc-fm-01', label: 'FM-01',  device: 'LP-100 Low Power FM Transmitter',  bandwidthMHz: 0.2,   color: OC['svc-other'],   serviceId: 'svc-other' },
+      { id: 'oc-fm-01', label: 'FM-01',  device: 'LP-100 Low Power FM Transmitter',  bandwidthMHz: 0.2,   color: C['svc-other'],   serviceId: 'svc-other' },
     ],
   },
   {
@@ -160,34 +130,34 @@ export const venues: Venue[] = [
     name: 'Athletics (FOP)',
     requests: [
       // §3.5 Wireless Mics
-      { id: 'ath-mic-01', label: 'MIC-01', device: 'Shure Axient Digital AXT200',    bandwidthMHz: 0.2,   color: ATH['svc-wmic'],    serviceId: 'svc-wmic' },
-      { id: 'ath-mic-02', label: 'MIC-02', device: 'Sennheiser Digital 6000',         bandwidthMHz: 0.2,   color: ATH['svc-wmic'],    serviceId: 'svc-wmic' },
-      { id: 'ath-mic-03', label: 'MIC-03', device: 'Sennheiser EW-DX (UHF)',          bandwidthMHz: 0.2,   color: ATH['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'ath-mic-01', label: 'MIC-01', device: 'Shure Axient Digital AXT200',    bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'ath-mic-02', label: 'MIC-02', device: 'Sennheiser Digital 6000',         bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'ath-mic-03', label: 'MIC-03', device: 'Sennheiser EW-DX (UHF)',          bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
       // §3.6 IEM
-      { id: 'ath-iem-01', label: 'IEM-01', device: 'Shure PSM1000',                   bandwidthMHz: 0.2,   color: ATH['svc-iem'],     serviceId: 'svc-iem' },
-      { id: 'ath-iem-02', label: 'IEM-02', device: 'Sennheiser SR 2050 IEM',          bandwidthMHz: 0.2,   color: ATH['svc-iem'],     serviceId: 'svc-iem' },
+      { id: 'ath-iem-01', label: 'IEM-01', device: 'Shure PSM1000',                   bandwidthMHz: 0.2,   color: C['svc-iem'],     serviceId: 'svc-iem' },
+      { id: 'ath-iem-02', label: 'IEM-02', device: 'Sennheiser SR 2050 IEM',          bandwidthMHz: 0.2,   color: C['svc-iem'],     serviceId: 'svc-iem' },
       // §3.3 Audio Intercom (UHF duplex)
-      { id: 'ath-com-01', label: 'COM-01', device: 'Riedel Artist 32 (PLMR)',         bandwidthMHz: 0.2,   color: ATH['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
-      { id: 'ath-com-02', label: 'COM-02', device: 'Clear-Com FreeSpeak Edge',        bandwidthMHz: 0.2,   color: ATH['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
+      { id: 'ath-com-01', label: 'COM-01', device: 'Riedel Artist 32 (PLMR)',         bandwidthMHz: 0.2,   color: C['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
+      { id: 'ath-com-02', label: 'COM-02', device: 'Clear-Com FreeSpeak Edge',        bandwidthMHz: 0.2,   color: C['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
       // §3.1 PLMR
-      { id: 'ath-pmr-01', label: 'PMR-01', device: 'Kenwood ProTalk TK-3501',         bandwidthMHz: 0.2,   color: ATH['svc-plmr'],    serviceId: 'svc-plmr' },
-      { id: 'ath-pmr-02', label: 'PMR-02', device: 'Kenwood ProTalk TK-3501',         bandwidthMHz: 0.2,   color: ATH['svc-plmr'],    serviceId: 'svc-plmr' },
+      { id: 'ath-pmr-01', label: 'PMR-01', device: 'Kenwood ProTalk TK-3501',         bandwidthMHz: 0.2,   color: C['svc-plmr'],    serviceId: 'svc-plmr' },
+      { id: 'ath-pmr-02', label: 'PMR-02', device: 'Kenwood ProTalk TK-3501',         bandwidthMHz: 0.2,   color: C['svc-plmr'],    serviceId: 'svc-plmr' },
       // §3.2 Telemetry — Omega timing + camera control
-      { id: 'ath-tel-01', label: 'TEL-01', device: 'Omega Timing Transponder',        bandwidthMHz: 0.025, color: ATH['svc-telem'],   serviceId: 'svc-telem' },
-      { id: 'ath-tel-02', label: 'TEL-02', device: 'RF Camera Control Head',          bandwidthMHz: 0.025, color: ATH['svc-telem'],   serviceId: 'svc-telem' },
-      { id: 'ath-tel-03', label: 'TEL-03', device: 'RF Camera Control Head',          bandwidthMHz: 0.025, color: ATH['svc-telem'],   serviceId: 'svc-telem' },
+      { id: 'ath-tel-01', label: 'TEL-01', device: 'Omega Timing Transponder',        bandwidthMHz: 0.025, color: C['svc-telem'],   serviceId: 'svc-telem' },
+      { id: 'ath-tel-02', label: 'TEL-02', device: 'RF Camera Control Head',          bandwidthMHz: 0.025, color: C['svc-telem'],   serviceId: 'svc-telem' },
+      { id: 'ath-tel-03', label: 'TEL-03', device: 'RF Camera Control Head',          bandwidthMHz: 0.025, color: C['svc-telem'],   serviceId: 'svc-telem' },
       // §3.4 Wireless Camera
-      { id: 'ath-cam-01', label: 'CAM-01', device: 'Vislink HCAM-S L-Band',           bandwidthMHz: 8.0,   color: ATH['svc-cam'],     serviceId: 'svc-cam' },
-      { id: 'ath-cam-02', label: 'CAM-02', device: 'Vislink HCAM-S L-Band',           bandwidthMHz: 8.0,   color: ATH['svc-cam'],     serviceId: 'svc-cam' },
+      { id: 'ath-cam-01', label: 'CAM-01', device: 'Vislink HCAM-S L-Band',           bandwidthMHz: 8.0,   color: C['svc-cam'],     serviceId: 'svc-cam' },
+      { id: 'ath-cam-02', label: 'CAM-02', device: 'Vislink HCAM-S L-Band',           bandwidthMHz: 8.0,   color: C['svc-cam'],     serviceId: 'svc-cam' },
       // §3.7 Earth Stations
-      { id: 'ath-sat-01', label: 'SAT-01', device: 'Globecomm Transportable VSAT',   bandwidthMHz: 3.0,   color: ATH['svc-earth'],   serviceId: 'svc-earth' },
+      { id: 'ath-sat-01', label: 'SAT-01', device: 'Globecomm Transportable VSAT',   bandwidthMHz: 3.0,   color: C['svc-earth'],   serviceId: 'svc-earth' },
       // §3.9 Fixed PtP — timing backbone to IBC
-      { id: 'ath-ptp-01', label: 'PTP-01', device: 'Ericsson MINI-LINK (Venue→IBC)', bandwidthMHz: 28.0,  color: ATH['svc-ptp'],     serviceId: 'svc-ptp' },
+      { id: 'ath-ptp-01', label: 'PTP-01', device: 'Ericsson MINI-LINK (Venue→IBC)', bandwidthMHz: 28.0,  color: C['svc-ptp'],     serviceId: 'svc-ptp' },
       // §3.10 WLAN
-      { id: 'ath-wlan-01', label: 'AP-01', device: 'Cisco Catalyst 9136 (5 GHz)',    bandwidthMHz: 80.0,  color: ATH['svc-wlan'],    serviceId: 'svc-wlan' },
+      { id: 'ath-wlan-01', label: 'AP-01', device: 'Cisco Catalyst 9136 (5 GHz)',    bandwidthMHz: 80.0,  color: C['svc-wlan'],    serviceId: 'svc-wlan' },
       // §3.11 Photographers
-      { id: 'ath-ph-01', label: 'PHO-01', device: 'Pocket Wizard MultiMAX II',       bandwidthMHz: 0.1,   color: ATH['svc-photo'],   serviceId: 'svc-photo' },
-      { id: 'ath-ph-02', label: 'PHO-02', device: 'Pocket Wizard MultiMAX II',       bandwidthMHz: 0.1,   color: ATH['svc-photo'],   serviceId: 'svc-photo' },
+      { id: 'ath-ph-01', label: 'PHO-01', device: 'Pocket Wizard MultiMAX II',       bandwidthMHz: 0.1,   color: C['svc-photo'],   serviceId: 'svc-photo' },
+      { id: 'ath-ph-02', label: 'PHO-02', device: 'Pocket Wizard MultiMAX II',       bandwidthMHz: 0.1,   color: C['svc-photo'],   serviceId: 'svc-photo' },
     ],
   },
   {
@@ -195,32 +165,32 @@ export const venues: Venue[] = [
     name: 'IBC / Media',
     requests: [
       // §3.5 Wireless Mics
-      { id: 'ibc-mic-01', label: 'MIC-01', device: 'Shure Axient Digital AXT200',    bandwidthMHz: 0.2,   color: IBC['svc-wmic'],    serviceId: 'svc-wmic' },
-      { id: 'ibc-mic-02', label: 'MIC-02', device: 'Sony DWX Series (UHF)',           bandwidthMHz: 0.2,   color: IBC['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'ibc-mic-01', label: 'MIC-01', device: 'Shure Axient Digital AXT200',    bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
+      { id: 'ibc-mic-02', label: 'MIC-02', device: 'Sony DWX Series (UHF)',           bandwidthMHz: 0.2,   color: C['svc-wmic'],    serviceId: 'svc-wmic' },
       // §3.6 IEM
-      { id: 'ibc-iem-01', label: 'IEM-01', device: 'Shure PSM900',                   bandwidthMHz: 0.2,   color: IBC['svc-iem'],     serviceId: 'svc-iem' },
+      { id: 'ibc-iem-01', label: 'IEM-01', device: 'Shure PSM900',                   bandwidthMHz: 0.2,   color: C['svc-iem'],     serviceId: 'svc-iem' },
       // §3.3 Audio Intercom (UHF duplex)
-      { id: 'ibc-com-01', label: 'COM-01', device: 'Riedel Artist 32 (PLMR)',        bandwidthMHz: 0.2,   color: IBC['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
+      { id: 'ibc-com-01', label: 'COM-01', device: 'Riedel Artist 32 (PLMR)',        bandwidthMHz: 0.2,   color: C['svc-intercom'], serviceId: 'svc-intercom', duplexOffsetMHz: 5 },
       // §3.1 PLMR
-      { id: 'ibc-pmr-01', label: 'PMR-01', device: 'Motorola MOTOTRBO SL300',        bandwidthMHz: 0.2,   color: IBC['svc-plmr'],    serviceId: 'svc-plmr' },
+      { id: 'ibc-pmr-01', label: 'PMR-01', device: 'Motorola MOTOTRBO SL300',        bandwidthMHz: 0.2,   color: C['svc-plmr'],    serviceId: 'svc-plmr' },
       // §3.2 Telemetry
-      { id: 'ibc-tel-01', label: 'TEL-01', device: 'RF Camera Control Head',         bandwidthMHz: 0.025, color: IBC['svc-telem'],   serviceId: 'svc-telem' },
+      { id: 'ibc-tel-01', label: 'TEL-01', device: 'RF Camera Control Head',         bandwidthMHz: 0.025, color: C['svc-telem'],   serviceId: 'svc-telem' },
       // §3.4 Wireless Camera
-      { id: 'ibc-cam-01', label: 'CAM-01', device: 'Grass Valley LDX 135 (Exlink)',  bandwidthMHz: 8.0,   color: IBC['svc-cam'],     serviceId: 'svc-cam' },
+      { id: 'ibc-cam-01', label: 'CAM-01', device: 'Grass Valley LDX 135 (Exlink)',  bandwidthMHz: 8.0,   color: C['svc-cam'],     serviceId: 'svc-cam' },
       // §3.7 Earth Stations — permanent SNG farm at IBC
-      { id: 'ibc-sat-01', label: 'SAT-01', device: 'Comtech SNG Uplink Terminal',    bandwidthMHz: 3.0,   color: IBC['svc-earth'],   serviceId: 'svc-earth' },
-      { id: 'ibc-sat-02', label: 'SAT-02', device: 'Globecomm Transportable VSAT',   bandwidthMHz: 3.0,   color: IBC['svc-earth'],   serviceId: 'svc-earth' },
+      { id: 'ibc-sat-01', label: 'SAT-01', device: 'Comtech SNG Uplink Terminal',    bandwidthMHz: 3.0,   color: C['svc-earth'],   serviceId: 'svc-earth' },
+      { id: 'ibc-sat-02', label: 'SAT-02', device: 'Globecomm Transportable VSAT',   bandwidthMHz: 3.0,   color: C['svc-earth'],   serviceId: 'svc-earth' },
       // §3.8 Microwave Links
-      { id: 'ibc-mwl-01', label: 'MWL-01', device: 'Nokia Wavence (Studio Link)',    bandwidthMHz: 28.0,  color: IBC['svc-mmlink'],  serviceId: 'svc-mmlink' },
+      { id: 'ibc-mwl-01', label: 'MWL-01', device: 'Nokia Wavence (Studio Link)',    bandwidthMHz: 28.0,  color: C['svc-mmlink'],  serviceId: 'svc-mmlink' },
       // §3.9 Fixed PtP — IBC backbone
-      { id: 'ibc-ptp-01', label: 'PTP-01', device: 'Ericsson MINI-LINK 6352',        bandwidthMHz: 28.0,  color: IBC['svc-ptp'],     serviceId: 'svc-ptp' },
+      { id: 'ibc-ptp-01', label: 'PTP-01', device: 'Ericsson MINI-LINK 6352',        bandwidthMHz: 28.0,  color: C['svc-ptp'],     serviceId: 'svc-ptp' },
       // §3.10 WLAN
-      { id: 'ibc-wlan-01', label: 'AP-01', device: 'Cisco Catalyst 9136 (5 GHz)',   bandwidthMHz: 80.0,  color: IBC['svc-wlan'],    serviceId: 'svc-wlan' },
-      { id: 'ibc-wlan-02', label: 'AP-02', device: 'Ruckus R750 (5 GHz)',            bandwidthMHz: 80.0,  color: IBC['svc-wlan'],    serviceId: 'svc-wlan' },
+      { id: 'ibc-wlan-01', label: 'AP-01', device: 'Cisco Catalyst 9136 (5 GHz)',   bandwidthMHz: 80.0,  color: C['svc-wlan'],    serviceId: 'svc-wlan' },
+      { id: 'ibc-wlan-02', label: 'AP-02', device: 'Ruckus R750 (5 GHz)',            bandwidthMHz: 80.0,  color: C['svc-wlan'],    serviceId: 'svc-wlan' },
       // §3.11 Photographers
-      { id: 'ibc-ph-01', label: 'PHO-01', device: 'Pocket Wizard MultiMAX II',      bandwidthMHz: 0.1,   color: IBC['svc-photo'],   serviceId: 'svc-photo' },
+      { id: 'ibc-ph-01', label: 'PHO-01', device: 'Pocket Wizard MultiMAX II',      bandwidthMHz: 0.1,   color: C['svc-photo'],   serviceId: 'svc-photo' },
       // §3.12 FM mass-cast
-      { id: 'ibc-fm-01', label: 'FM-01',  device: 'LP-100 Low Power FM Transmitter', bandwidthMHz: 0.2,  color: IBC['svc-other'],   serviceId: 'svc-other' },
+      { id: 'ibc-fm-01', label: 'FM-01',  device: 'LP-100 Low Power FM Transmitter', bandwidthMHz: 0.2,  color: C['svc-other'],   serviceId: 'svc-other' },
     ],
   },
 ];
