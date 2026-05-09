@@ -60,6 +60,7 @@ export function SpectrumView({
       allocations={allocations.filter(a => a.bandId === band.id)}
       reservations={reservations.filter(r => r.bandId === band.id)}
       allRequests={allRequests}
+      selectedVenueId={selectedVenueId}
       dragPreview={dragPreview}
       onDeallocate={onDeallocate}
       onRemoveReservation={onRemoveReservation}
