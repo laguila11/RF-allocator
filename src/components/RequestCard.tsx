@@ -2,12 +2,6 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { FrequencyRequest } from '../types';
 
-const PRIORITY_COLOR: Record<string, string> = {
-  high: '#ef4444',
-  medium: '#f59e0b',
-  low: '#94a3b8',
-};
-
 interface Props {
   request: FrequencyRequest;
   overlay?: boolean;
@@ -46,8 +40,8 @@ export function RequestCard({ request, overlay }: Props) {
       {...listeners}
     >
       <div style={{
-        width: '8px', height: '8px', borderRadius: '50%',
-        backgroundColor: PRIORITY_COLOR[request.priority], flexShrink: 0,
+        width: '8px', height: '28px', borderRadius: '2px',
+        backgroundColor: request.color, flexShrink: 0, opacity: 0.85,
       }} />
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>

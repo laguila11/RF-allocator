@@ -12,7 +12,6 @@ export interface FrequencyRequest {
   label: string;
   device: string;
   bandwidthMHz: number;
-  priority: 'high' | 'medium' | 'low';
   color: string;
   serviceId: string;
   duplexOffsetMHz?: number;

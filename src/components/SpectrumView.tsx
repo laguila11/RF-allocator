@@ -4,6 +4,7 @@ import { BandRow } from './BandRow';
 interface Props {
   bands: FrequencyBand[];
   services: Service[];
+  selectedServiceId: string;
   allRequests: FrequencyRequest[];
   allocations: Allocation[];
   reservations: Reservation[];
@@ -29,12 +30,40 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 export function SpectrumView({
-  bands, services, allRequests, allocations, reservations, venues,
+  bands, services, selectedServiceId, allRequests, allocations, reservations, venues,
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onReserveRequest,
 }: Props) {
   const totalBW = bands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
   const usedBW = allocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
   const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
+
+  // Determine which bands to show
+  const visibleBands = selectedServiceId === 'all'
+    ? bands
+    : (() => {
+        const svc = services.find(s => s.id === selectedServiceId);
+        return svc ? bands.filter(b => svc.bandIds.includes(b.id)) : bands;
+      })();
+
+  const activeService = selectedServiceId !== 'all'
+    ? services.find(s => s.id === selectedServiceId) ?? null
+    : null;
+
+  const bandRow = (band: FrequencyBand) => (
+    <BandRow
+      key={band.id}
+      band={band}
+      allocations={allocations.filter(a => a.bandId === band.id)}
+      reservations={reservations.filter(r => r.bandId === band.id)}
+      allRequests={allRequests}
+      venues={venues}
+      dragPreview={dragPreview}
+      onDeallocate={onDeallocate}
+      onRemoveReservation={onRemoveReservation}
+      onRegisterStrip={onRegisterStrip}
+      onReserveRequest={onReserveRequest}
+    />
+  );
 
   return (
     <div style={{ padding: '24px', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
@@ -45,57 +74,36 @@ export function SpectrumView({
         <Stat label="Utilization" value={`${utilizationPct}%`} accent />
       </div>
 
-      {services.map(service => {
-        const serviceBands = bands.filter(b => service.bandIds.includes(b.id));
-        if (serviceBands.length === 0) return null;
-        return (
-          <div key={service.id} style={{ marginBottom: '36px' }}>
-            {/* Service header */}
+      {activeService ? (
+        /* ── Filtered: single service ── */
+        <div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            marginBottom: '20px', paddingBottom: '12px',
+            borderBottom: `2px solid ${activeService.color}44`,
+          }}>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              marginBottom: '16px', paddingBottom: '10px',
-              borderBottom: `2px solid ${service.color}33`,
+              width: '10px', height: '10px', borderRadius: '3px',
+              backgroundColor: activeService.color, flexShrink: 0,
+            }} />
+            <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {activeService.name}
+            </span>
+            <div style={{ height: '1px', flex: 1, backgroundColor: `${activeService.color}22` }} />
+            <span style={{
+              fontSize: '11px', color: activeService.color, fontWeight: '600',
+              backgroundColor: `${activeService.color}12`,
+              padding: '2px 8px', borderRadius: '4px',
             }}>
-              <div style={{
-                width: '10px', height: '10px', borderRadius: '3px',
-                backgroundColor: service.color, flexShrink: 0,
-              }} />
-              <span style={{
-                color: '#1e293b', fontWeight: '700', fontSize: '13px',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
-              }}>
-                {service.name}
-              </span>
-              <div style={{
-                height: '1px', flex: 1, backgroundColor: `${service.color}22`,
-              }} />
-              <span style={{
-                fontSize: '11px', color: service.color, fontWeight: '600',
-                backgroundColor: `${service.color}12`,
-                padding: '2px 8px', borderRadius: '4px',
-              }}>
-                {serviceBands.map(b => b.name).join(' · ')}
-              </span>
-            </div>
-
-            {serviceBands.map(band => (
-              <BandRow
-                key={band.id}
-                band={band}
-                allocations={allocations.filter(a => a.bandId === band.id)}
-                reservations={reservations.filter(r => r.bandId === band.id)}
-                allRequests={allRequests}
-                venues={venues}
-                dragPreview={dragPreview}
-                onDeallocate={onDeallocate}
-                onRemoveReservation={onRemoveReservation}
-                onRegisterStrip={onRegisterStrip}
-                onReserveRequest={onReserveRequest}
-              />
-            ))}
+              {visibleBands.length} {visibleBands.length === 1 ? 'band' : 'bands'}
+            </span>
           </div>
-        );
-      })}
+          {visibleBands.map(bandRow)}
+        </div>
+      ) : (
+        /* ── All services: flat band list ── */
+        visibleBands.map(bandRow)
+      )}
     </div>
   );
 }

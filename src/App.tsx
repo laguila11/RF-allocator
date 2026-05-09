@@ -24,6 +24,7 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
 
 export default function App() {
   const [selectedVenueId, setSelectedVenueId] = useState(venues[0].id);
+  const [selectedServiceId, setSelectedServiceId] = useState('all');
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [activeRequest, setActiveRequest] = useState<FrequencyRequest | null>(null);
@@ -297,6 +298,7 @@ export default function App() {
           <SpectrumView
             bands={initialBands}
             services={services}
+            selectedServiceId={selectedServiceId}
             allRequests={allRequests}
             allocations={allocations}
             reservations={reservations}
@@ -312,7 +314,9 @@ export default function App() {
             venues={venues}
             services={services}
             selectedVenueId={selectedVenueId}
+            selectedServiceId={selectedServiceId}
             onVenueChange={setSelectedVenueId}
+            onServiceChange={setSelectedServiceId}
           />
         </div>
       </div>

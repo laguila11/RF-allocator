@@ -11,8 +11,9 @@ function gridSteps(range: number) {
   if (range >= 500) return { major: 100, minor: 20  };
   if (range >= 200) return { major: 50,  minor: 10  };
   if (range >= 100) return { major: 20,  minor: 5   };
-  if (range >= 30)  return { major: 5,   minor: 1   };
-  if (range >= 10)  return { major: 2,   minor: 0.5 };
+  if (range >= 50)  return { major: 10,  minor: 2   };
+  if (range >= 20)  return { major: 5,   minor: 1   };
+  if (range >= 8)   return { major: 2,   minor: 0.5 };
   return                   { major: 1,   minor: 0.2 };
 }
 
@@ -31,7 +32,7 @@ function buildGridLines(start: number, end: number, width: number) {
 
 function generateTicks(start: number, end: number): number[] {
   const range = end - start;
-  const step = range >= 500 ? 100 : range >= 200 ? 50 : range >= 100 ? 20 : range >= 30 ? 5 : 1;
+  const step = range >= 500 ? 100 : range >= 200 ? 50 : range >= 100 ? 20 : range >= 50 ? 10 : range >= 20 ? 5 : range >= 8 ? 2 : 1;
   const ticks: number[] = [];
   let f = Math.ceil(start / step) * step;
   while (f <= end) { ticks.push(f); f += step; }

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { FrequencyRequest, Service, Venue } from '../types';
 import { RequestCard } from './RequestCard';
 
@@ -7,10 +6,10 @@ interface Props {
   venues: Venue[];
   services: Service[];
   selectedVenueId: string;
+  selectedServiceId: string;
   onVenueChange: (id: string) => void;
+  onServiceChange: (id: string) => void;
 }
-
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
 function ChevronIcon() {
   return (
@@ -35,9 +34,11 @@ const selectStyle: React.CSSProperties = {
   appearance: 'none',
 };
 
-export function RequestPanel({ requests, venues, services, selectedVenueId, onVenueChange }: Props) {
-  const [selectedServiceId, setSelectedServiceId] = useState('all');
-
+export function RequestPanel({
+  requests, venues, services,
+  selectedVenueId, selectedServiceId,
+  onVenueChange, onServiceChange,
+}: Props) {
   const filtered = selectedServiceId === 'all'
     ? requests
     : requests.filter(r => r.serviceId === selectedServiceId);
@@ -70,7 +71,7 @@ export function RequestPanel({ requests, venues, services, selectedVenueId, onVe
             Service
           </label>
           <div style={{ position: 'relative' }}>
-            <select value={selectedServiceId} onChange={e => setSelectedServiceId(e.target.value)} style={selectStyle}>
+            <select value={selectedServiceId} onChange={e => onServiceChange(e.target.value)} style={selectStyle}>
               <option value="all">All Services</option>
               {services.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -98,21 +99,24 @@ export function RequestPanel({ requests, venues, services, selectedVenueId, onVe
             {requests.length === 0 ? 'All requests assigned' : 'No requests for this service'}
           </div>
         ) : (
-          [...filtered]
-            .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
-            .map(req => <RequestCard key={req.id} request={req} />)
+          filtered.map(req => <RequestCard key={req.id} request={req} />)
         )}
       </div>
 
-      {/* Legend */}
+      {/* Color legend */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-        <div style={{ display: 'flex', gap: '14px', justifyContent: 'center' }}>
-          {(['high', 'medium', 'low'] as const).map(p => (
-            <div key={p} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: p === 'high' ? '#ef4444' : p === 'medium' ? '#f59e0b' : '#94a3b8' }} />
-              <span style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'capitalize' }}>{p}</span>
-            </div>
-          ))}
+        <div style={{ color: '#94a3b8', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Color = Venue</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {venues.map(v => {
+            const svcId = selectedServiceId !== 'all' ? selectedServiceId : 'svc-wmic';
+            const sampleReq = v.requests.find(r => r.serviceId === svcId) ?? v.requests[0];
+            return (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: sampleReq?.color ?? '#94a3b8', flexShrink: 0 }} />
+                <span style={{ color: '#64748b', fontSize: '11px' }}>{v.name}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
