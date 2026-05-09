@@ -13,7 +13,7 @@ export interface FrequencyRequest {
   bandwidthMHz: number;
   priority: 'high' | 'medium' | 'low';
   color: string;
-  duplexOffsetMHz?: number; // if set, places a paired secondary allocation offset by this amount
+  duplexOffsetMHz?: number;
 }
 
 export interface Venue {
@@ -33,6 +33,14 @@ export interface Allocation {
   pairRole?: 'primary' | 'secondary';
 }
 
+export interface Reservation {
+  id: string;
+  bandId: string;
+  startMHz: number;
+  endMHz: number;
+  reason: string;
+}
+
 export interface DragPreview {
   bandId: string;
   startMHz: number;
@@ -43,4 +51,10 @@ export interface DragPreview {
     endMHz: number;
     valid: boolean;
   };
+}
+
+export interface PendingReserve {
+  bandId: string;
+  startMHz: number;
+  endMHz: number;
 }

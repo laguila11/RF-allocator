@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Venue } from '../types';
+import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Reservation, Venue } from '../types';
 import { AllocationBlock } from './AllocationBlock';
+import { ReservationBlock } from './ReservationBlock';
 
 const STRIP_HEIGHT = 88;
-const MAJOR_STEP = 1.0;   // 1 MHz  — darker lines
-const MINOR_STEP = 0.2;   // 200 kHz — lighter lines
+const SNAP_MHZ = 0.006;
+const MAJOR_STEP = 1.0;
+const MINOR_STEP = 0.2;
 
 function buildGridLines(start: number, end: number, width: number) {
   const lines: Array<{ left: number; major: boolean }> = [];
@@ -22,28 +24,41 @@ function buildGridLines(start: number, end: number, width: number) {
 function generateTicks(start: number, end: number): number[] {
   const ticks: number[] = [];
   let f = Math.ceil(start);
-  while (f <= end) { ticks.push(f); f++; }
+  while (f <= end) { ticks.push(f++); }
   return ticks;
 }
 
 interface Props {
   band: FrequencyBand;
   allocations: Allocation[];
+  reservations: Reservation[];
   allRequests: FrequencyRequest[];
   venues: Venue[];
   dragPreview: DragPreview | null;
-  onDeallocate: (allocationId: string) => void;
+  onDeallocate: (id: string) => void;
+  onRemoveReservation: (id: string) => void;
   onRegisterStrip: (bandId: string, el: HTMLElement | null) => void;
+  onReserveRequest: (bandId: string, startMHz: number, endMHz: number) => void;
 }
 
-export function BandRow({ band, allocations, allRequests, venues, dragPreview, onDeallocate, onRegisterStrip }: Props) {
+export function BandRow({
+  band, allocations, reservations, allRequests, venues,
+  dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onReserveRequest,
+}: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: band.id });
   const [stripWidth, setStripWidth] = useState(800);
   const roRef = useRef<ResizeObserver | null>(null);
+  const stripElRef = useRef<HTMLElement | null>(null);
+
+  // Right-click selection state
+  const reservingRef = useRef(false);
+  const reserveStartRef = useRef(0);
+  const [reserveSelection, setReserveSelection] = useState<{ startMHz: number; endMHz: number } | null>(null);
 
   const setRef = useCallback((el: HTMLElement | null) => {
     setNodeRef(el);
     onRegisterStrip(band.id, el);
+    stripElRef.current = el;
     roRef.current?.disconnect();
     roRef.current = null;
     if (el) {
@@ -56,15 +71,61 @@ export function BandRow({ band, allocations, allRequests, venues, dragPreview, o
 
   useEffect(() => () => roRef.current?.disconnect(), []);
 
+  // Window-level handlers for right-click drag (so selection works even when cursor leaves the strip)
+  useEffect(() => {
+    const snapFreq = (clientX: number) => {
+      if (!stripElRef.current) return 0;
+      const rect = stripElRef.current.getBoundingClientRect();
+      const relX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      const raw = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+      return Math.max(band.startMHz, Math.min(Math.round(raw / SNAP_MHZ) * SNAP_MHZ, band.endMHz));
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!reservingRef.current) return;
+      setReserveSelection({ startMHz: reserveStartRef.current, endMHz: snapFreq(e.clientX) });
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button !== 2 || !reservingRef.current) return;
+      reservingRef.current = false;
+      setReserveSelection(prev => {
+        if (!prev) return null;
+        const [s, end] = [Math.min(prev.startMHz, prev.endMHz), Math.max(prev.startMHz, prev.endMHz)];
+        if (end - s >= SNAP_MHZ * 4) onReserveRequest(band.id, s, end);
+        return null;
+      });
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [band, onReserveRequest]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 2) return;
+    e.preventDefault();
+    if (!stripElRef.current) return;
+    const rect = stripElRef.current.getBoundingClientRect();
+    const relX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const raw = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+    const snapped = Math.max(band.startMHz, Math.min(Math.round(raw / SNAP_MHZ) * SNAP_MHZ, band.endMHz));
+    reserveStartRef.current = snapped;
+    reservingRef.current = true;
+    setReserveSelection({ startMHz: snapped, endMHz: snapped });
+  };
+
   const bandRange = band.endMHz - band.startMHz;
   const usedBW = allocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
+  const reservedBW = reservations.reduce((s, r) => s + (r.endMHz - r.startMHz), 0);
   const utilizationPct = Math.round((usedBW / bandRange) * 100);
   const gridLines = buildGridLines(band.startMHz, band.endMHz, stripWidth);
   const ticks = generateTicks(band.startMHz, band.endMHz);
-
   const preview = dragPreview?.bandId === band.id ? dragPreview : null;
 
-  // Group paired allocations for connector rendering
   const pairGroups: Record<string, Allocation[]> = {};
   for (const a of allocations) {
     if (a.pairId) {
@@ -75,19 +136,20 @@ export function BandRow({ band, allocations, allRequests, venues, dragPreview, o
 
   return (
     <div style={{ marginBottom: '32px' }}>
-      {/* Band header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
         <div style={{ width: '4px', height: '20px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
         <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '14px' }}>{band.name}</span>
         <span style={{ color: '#94a3b8', fontSize: '12px' }}>{band.startMHz}–{band.endMHz} MHz</span>
         <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '11px' }}>
           {allocations.length} assigned · {utilizationPct}% used
+          {reservedBW > 0 && ` · ${Math.round(reservedBW * 1000)} kHz reserved`}
         </span>
       </div>
 
-      {/* Droppable strip */}
       <div
         ref={setRef}
+        onMouseDown={handleMouseDown}
+        onContextMenu={e => e.preventDefault()}
         style={{
           position: 'relative',
           width: '100%',
@@ -100,53 +162,62 @@ export function BandRow({ band, allocations, allRequests, venues, dragPreview, o
             : '0 1px 4px rgba(0,0,0,0.04)',
           transition: 'background-color 0.1s, border-color 0.1s, box-shadow 0.1s',
           overflow: 'hidden',
+          cursor: 'crosshair',
         }}
       >
-        {/* Band color tint */}
+        {/* Band tint */}
         <div style={{ position: 'absolute', inset: 0, backgroundColor: band.color, opacity: 0.03, pointerEvents: 'none' }} />
 
         {/* Grid lines */}
         {gridLines.map(({ left, major }, i) => (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${left}px`,
-              top: 0,
-              bottom: 0,
-              width: '1px',
-              backgroundColor: major ? '#94a3b8' : '#e2e8f0',
-              opacity: major ? 0.7 : 1,
-              pointerEvents: 'none',
-            }}
-          />
+          <div key={i} style={{
+            position: 'absolute', left: `${left}px`, top: 0, bottom: 0, width: '1px',
+            backgroundColor: major ? '#94a3b8' : '#e2e8f0',
+            opacity: major ? 0.7 : 1,
+            pointerEvents: 'none',
+          }} />
         ))}
 
         {/* Empty hint */}
-        {allocations.length === 0 && !preview && (
+        {allocations.length === 0 && reservations.length === 0 && !preview && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#cbd5e1', fontSize: '12px', pointerEvents: 'none', fontStyle: 'italic',
           }}>
-            Drop requests here
+            Drop requests here · right-click drag to reserve
           </div>
         )}
+
+        {/* Right-click selection overlay */}
+        {reserveSelection && (() => {
+          const [s, e] = [Math.min(reserveSelection.startMHz, reserveSelection.endMHz), Math.max(reserveSelection.startMHz, reserveSelection.endMHz)];
+          const left = ((s - band.startMHz) / bandRange) * stripWidth;
+          const w = Math.max(((e - s) / bandRange) * stripWidth, 2);
+          return (
+            <div style={{
+              position: 'absolute', left: `${left}px`, width: `${w}px`,
+              top: '2px', bottom: '2px',
+              backgroundColor: '#f59e0b', opacity: 0.22,
+              borderRadius: '3px', border: '2px dashed #d97706',
+              pointerEvents: 'none',
+            }} />
+          );
+        })()}
 
         {/* Drag preview ghost(s) */}
         {preview && (() => {
           const color = preview.valid ? '#16a34a' : '#dc2626';
           const blocks = [];
           const addGhost = (sStart: number, sEnd: number, key: string) => {
-            const left = ((sStart - band.startMHz) / bandRange) * stripWidth;
-            const width = Math.max(((sEnd - sStart) / bandRange) * stripWidth, 24);
+            const l = ((sStart - band.startMHz) / bandRange) * stripWidth;
+            const w = Math.max(((sEnd - sStart) / bandRange) * stripWidth, 24);
             blocks.push(
               <div key={key} style={{
-                position: 'absolute', left: `${left}px`, width: `${width}px`,
+                position: 'absolute', left: `${l}px`, width: `${w}px`,
                 top: '6px', bottom: '6px',
                 backgroundColor: color, opacity: 0.18,
-                borderRadius: '4px',
-                border: `2px dashed ${color}`,
+                borderRadius: '4px', border: `2px dashed ${color}`,
                 pointerEvents: 'none',
               }} />
             );
@@ -154,18 +225,15 @@ export function BandRow({ band, allocations, allRequests, venues, dragPreview, o
           addGhost(preview.startMHz, preview.endMHz, 'pri');
           if (preview.secondary) {
             addGhost(preview.secondary.startMHz, preview.secondary.endMHz, 'sec');
-            // Connector between ghosts
             const x1 = ((preview.endMHz - band.startMHz) / bandRange) * stripWidth;
             const x2 = ((preview.secondary.startMHz - band.startMHz) / bandRange) * stripWidth;
-            if (x2 > x1) {
-              blocks.push(
-                <div key="conn" style={{
-                  position: 'absolute', left: `${x1}px`, width: `${x2 - x1}px`,
-                  bottom: '10px', height: '2px',
-                  backgroundColor: color, opacity: 0.4, pointerEvents: 'none',
-                }} />
-              );
-            }
+            if (x2 > x1) blocks.push(
+              <div key="conn" style={{
+                position: 'absolute', left: `${x1}px`, width: `${x2 - x1}px`,
+                bottom: '10px', height: '2px',
+                backgroundColor: color, opacity: 0.4, pointerEvents: 'none',
+              }} />
+            );
           }
           return blocks;
         })()}
@@ -187,6 +255,17 @@ export function BandRow({ band, allocations, allRequests, venues, dragPreview, o
             }} />
           );
         })}
+
+        {/* Reservation blocks */}
+        {reservations.map(r => (
+          <ReservationBlock
+            key={r.id}
+            reservation={r}
+            band={band}
+            stripWidth={stripWidth}
+            onRemove={onRemoveReservation}
+          />
+        ))}
 
         {/* Allocation blocks */}
         {allocations.map(alloc => {

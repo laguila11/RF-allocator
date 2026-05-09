@@ -1,14 +1,17 @@
-import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Venue } from '../types';
+import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Reservation, Venue } from '../types';
 import { BandRow } from './BandRow';
 
 interface Props {
   bands: FrequencyBand[];
   allRequests: FrequencyRequest[];
   allocations: Allocation[];
+  reservations: Reservation[];
   venues: Venue[];
   dragPreview: DragPreview | null;
-  onDeallocate: (allocationId: string) => void;
+  onDeallocate: (id: string) => void;
+  onRemoveReservation: (id: string) => void;
   onRegisterStrip: (bandId: string, el: HTMLElement | null) => void;
+  onReserveRequest: (bandId: string, startMHz: number, endMHz: number) => void;
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -24,7 +27,10 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-export function SpectrumView({ bands, allRequests, allocations, venues, dragPreview, onDeallocate, onRegisterStrip }: Props) {
+export function SpectrumView({
+  bands, allRequests, allocations, reservations, venues,
+  dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onReserveRequest,
+}: Props) {
   const totalBW = bands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
   const usedBW = allocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
   const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
@@ -43,11 +49,14 @@ export function SpectrumView({ bands, allRequests, allocations, venues, dragPrev
           key={band.id}
           band={band}
           allocations={allocations.filter(a => a.bandId === band.id)}
+          reservations={reservations.filter(r => r.bandId === band.id)}
           allRequests={allRequests}
           venues={venues}
           dragPreview={dragPreview}
           onDeallocate={onDeallocate}
+          onRemoveReservation={onRemoveReservation}
           onRegisterStrip={onRegisterStrip}
+          onReserveRequest={onReserveRequest}
         />
       ))}
     </div>

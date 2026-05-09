@@ -4,28 +4,54 @@ import type { DragEndEvent, DragMoveEvent, DragStartEvent } from '@dnd-kit/core'
 import { SpectrumView } from './components/SpectrumView';
 import { RequestPanel } from './components/RequestPanel';
 import { RequestCard } from './components/RequestCard';
+import { ReserveDialog } from './components/ReserveDialog';
 import { initialBands, venues, allRequests } from './data';
-import type { Allocation, DragPreview, FrequencyRequest } from './types';
+import type { Allocation, DragPreview, FrequencyRequest, PendingReserve, Reservation } from './types';
 
-const SNAP_MHZ = 0.006; // 6 kHz
+const SNAP_MHZ = 0.006;
+
+function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
+  return !(aEnd <= bStart || aStart >= bEnd);
+}
 
 export default function App() {
   const [selectedVenueId, setSelectedVenueId] = useState(venues[0].id);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [activeRequest, setActiveRequest] = useState<FrequencyRequest | null>(null);
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pendingReserve, setPendingReserve] = useState<PendingReserve | null>(null);
+  const [lastReservationId, setLastReservationId] = useState<string | null>(null);
 
   const pointerXRef = useRef(0);
+  const pointerYRef = useRef(0);
   const bandStripRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const tooltipElRef = useRef<HTMLDivElement | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  // Track pointer position (used for both drop position and tooltip)
   useEffect(() => {
-    const track = (e: PointerEvent) => { pointerXRef.current = e.clientX; };
-    window.addEventListener('pointermove', track);
+    const track = (e: PointerEvent) => {
+      pointerXRef.current = e.clientX;
+      pointerYRef.current = e.clientY;
+    };
+    window.addEventListener('pointermove', track, { passive: true });
     return () => window.removeEventListener('pointermove', track);
   }, []);
+
+  // Keep tooltip DOM position in sync with pointer during drag (no React re-render needed)
+  useEffect(() => {
+    if (!activeRequest) return;
+    const move = (e: PointerEvent) => {
+      if (!tooltipElRef.current) return;
+      tooltipElRef.current.style.left = `${e.clientX + 14}px`;
+      tooltipElRef.current.style.top = `${e.clientY - 52}px`;
+    };
+    window.addEventListener('pointermove', move, { passive: true });
+    return () => window.removeEventListener('pointermove', move);
+  }, [activeRequest]);
 
   const registerBandStrip = useCallback((bandId: string, el: HTMLElement | null) => {
     if (el) bandStripRefs.current.set(bandId, el);
@@ -39,7 +65,6 @@ export default function App() {
     const rect = stripEl.getBoundingClientRect();
     const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width));
     const rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
-    // Clamp so that dual secondary fits within the band
     const maxStart = req.duplexOffsetMHz !== undefined
       ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
       : band.endMHz - req.bandwidthMHz;
@@ -63,14 +88,21 @@ export default function App() {
     const pos = calcDropPosition(over.id as string, activeRequest);
     if (!pos) { setDragPreview(null); return; }
     const { band, startMHz, endMHz } = pos;
-    const existing = allocations.filter(a => a.bandId === band.id);
-    const primaryValid = !existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
+
+    const existingAllocs = allocations.filter(a => a.bandId === band.id);
+    const existingReservs = reservations.filter(r => r.bandId === band.id);
+
+    const isBlocked = (s: number, e: number) =>
+      existingAllocs.some(a => overlaps(s, e, a.startMHz, a.endMHz)) ||
+      existingReservs.some(r => overlaps(s, e, r.startMHz, r.endMHz));
+
+    const primaryValid = !isBlocked(startMHz, endMHz);
 
     if (activeRequest.duplexOffsetMHz !== undefined) {
       const secStart = Math.round((startMHz + activeRequest.duplexOffsetMHz) * 1000) / 1000;
       const secEnd = Math.round((secStart + activeRequest.bandwidthMHz) * 1000) / 1000;
       const secInBounds = secEnd <= band.endMHz;
-      const secValid = secInBounds && !existing.some(a => !(secEnd <= a.startMHz || secStart >= a.endMHz));
+      const secValid = secInBounds && !isBlocked(secStart, secEnd);
       setDragPreview({
         bandId: band.id, startMHz, endMHz, valid: primaryValid && secValid,
         secondary: { startMHz: secStart, endMHz: secEnd, valid: secValid },
@@ -78,7 +110,7 @@ export default function App() {
     } else {
       setDragPreview({ bandId: band.id, startMHz, endMHz, valid: primaryValid });
     }
-  }, [activeRequest, allocations, calcDropPosition]);
+  }, [activeRequest, allocations, reservations, calcDropPosition]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveRequest(null);
@@ -98,15 +130,18 @@ export default function App() {
     const pos = calcDropPosition(over.id as string, req);
     if (!pos) return;
     const { band, startMHz, endMHz } = pos;
-    const existing = allocations.filter(a => a.bandId === band.id);
+
+    const existingAllocs = allocations.filter(a => a.bandId === band.id);
+    const existingReservs = reservations.filter(r => r.bandId === band.id);
+    const isBlocked = (s: number, e: number) =>
+      existingAllocs.some(a => overlaps(s, e, a.startMHz, a.endMHz)) ||
+      existingReservs.some(r => overlaps(s, e, r.startMHz, r.endMHz));
 
     if (req.duplexOffsetMHz !== undefined) {
       const secStart = Math.round((startMHz + req.duplexOffsetMHz) * 1000) / 1000;
       const secEnd = Math.round((secStart + req.bandwidthMHz) * 1000) / 1000;
-      const priConflict = existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
-      const secConflict = existing.some(a => !(secEnd <= a.startMHz || secStart >= a.endMHz));
-      if (priConflict || secConflict) {
-        setErrorMsg(`Conflict: ${req.label} duplex pair overlaps an existing allocation`);
+      if (isBlocked(startMHz, endMHz) || isBlocked(secStart, secEnd)) {
+        setErrorMsg(`Conflict: ${req.label} duplex pair overlaps an existing allocation or reservation`);
         setTimeout(() => setErrorMsg(null), 3500);
         return;
       }
@@ -116,9 +151,8 @@ export default function App() {
         { id: `${pairId}-b`, requestId: req.id, bandId: band.id, startMHz: secStart, endMHz: secEnd, venueId: venueOfReq.id, pairId, pairRole: 'secondary' },
       ]);
     } else {
-      const conflict = existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
-      if (conflict) {
-        setErrorMsg(`Conflict: ${req.label} overlaps an existing allocation`);
+      if (isBlocked(startMHz, endMHz)) {
+        setErrorMsg(`Conflict: ${req.label} overlaps an existing allocation or reservation`);
         setTimeout(() => setErrorMsg(null), 3500);
         return;
       }
@@ -126,17 +160,39 @@ export default function App() {
         id: `alloc-${Date.now()}`, requestId: req.id, bandId: band.id, startMHz, endMHz, venueId: venueOfReq.id,
       }]);
     }
-  }, [allocations, calcDropPosition]);
+  }, [allocations, reservations, calcDropPosition]);
 
   const handleDeallocate = useCallback((allocationId: string) => {
     setAllocations(prev => {
       const target = prev.find(a => a.id === allocationId);
       if (!target) return prev;
-      // Remove both halves of a duplex pair together
       if (target.pairId) return prev.filter(a => a.pairId !== target.pairId);
       return prev.filter(a => a.id !== allocationId);
     });
   }, []);
+
+  const handleReserveRequest = useCallback((bandId: string, startMHz: number, endMHz: number) => {
+    setPendingReserve({ bandId, startMHz, endMHz });
+  }, []);
+
+  const handleReserveConfirm = useCallback((reason: string) => {
+    if (!pendingReserve) return;
+    const id = `res-${Date.now()}`;
+    setReservations(prev => [...prev, { id, ...pendingReserve, reason }]);
+    setLastReservationId(id);
+    setPendingReserve(null);
+  }, [pendingReserve]);
+
+  const handleRemoveReservation = useCallback((id: string) => {
+    setReservations(prev => prev.filter(r => r.id !== id));
+    setLastReservationId(prev => (prev === id ? null : prev));
+  }, []);
+
+  const handleUndoLastReservation = useCallback(() => {
+    if (!lastReservationId) return;
+    setReservations(prev => prev.filter(r => r.id !== lastReservationId));
+    setLastReservationId(null);
+  }, [lastReservationId]);
 
   return (
     <DndContext
@@ -165,15 +221,30 @@ export default function App() {
           <span style={{ color: '#cbd5e1' }}>|</span>
           <span style={{ color: '#94a3b8', fontSize: '13px' }}>Live Event Spectrum Coordinator</span>
 
-          {errorMsg && (
-            <div style={{
-              marginLeft: 'auto',
-              backgroundColor: '#fef2f2', border: '1px solid #fecaca',
-              color: '#dc2626', padding: '5px 12px', borderRadius: '6px', fontSize: '12px',
-            }}>
-              {errorMsg}
-            </div>
-          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {lastReservationId && (
+              <button
+                onClick={handleUndoLastReservation}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '5px 12px', borderRadius: '6px',
+                  border: '1px solid #fde68a', backgroundColor: '#fef9c3',
+                  color: '#92400e', fontSize: '12px', fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                ↩ Undo reservation
+              </button>
+            )}
+            {errorMsg && (
+              <div style={{
+                backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+                color: '#dc2626', padding: '5px 12px', borderRadius: '6px', fontSize: '12px',
+              }}>
+                {errorMsg}
+              </div>
+            )}
+          </div>
         </header>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 264px', flex: 1, overflow: 'hidden' }}>
@@ -181,10 +252,13 @@ export default function App() {
             bands={initialBands}
             allRequests={allRequests}
             allocations={allocations}
+            reservations={reservations}
             venues={venues}
             dragPreview={dragPreview}
             onDeallocate={handleDeallocate}
+            onRemoveReservation={handleRemoveReservation}
             onRegisterStrip={registerBandStrip}
+            onReserveRequest={handleReserveRequest}
           />
           <RequestPanel
             requests={pendingRequests}
@@ -194,6 +268,53 @@ export default function App() {
           />
         </div>
       </div>
+
+      {/* Frequency tooltip — position managed via DOM ref, content via React state */}
+      {dragPreview && (
+        <div
+          ref={tooltipElRef}
+          style={{
+            position: 'fixed',
+            left: `${pointerXRef.current + 14}px`,
+            top: `${pointerYRef.current - 52}px`,
+            backgroundColor: '#1e293b',
+            color: '#f8fafc',
+            fontSize: '11px',
+            fontFamily: 'ui-monospace, Consolas, monospace',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            pointerEvents: 'none',
+            zIndex: 9999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+            whiteSpace: 'nowrap',
+            lineHeight: 1.6,
+            borderLeft: `3px solid ${dragPreview.valid ? '#22c55e' : '#ef4444'}`,
+          }}
+        >
+          <div style={{
+            fontSize: '9px',
+            color: dragPreview.valid ? '#86efac' : '#fca5a5',
+            textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px',
+          }}>
+            {dragPreview.valid ? 'Place here' : 'Conflict'}
+          </div>
+          <div>{dragPreview.startMHz.toFixed(3)} MHz</div>
+          {dragPreview.secondary && (
+            <div style={{ color: '#94a3b8' }}>
+              {dragPreview.secondary.startMHz.toFixed(3)} MHz{' '}
+              <span style={{ fontSize: '9px' }}>[RX]</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {pendingReserve && (
+        <ReserveDialog
+          pending={pendingReserve}
+          onConfirm={handleReserveConfirm}
+          onCancel={() => setPendingReserve(null)}
+        />
+      )}
 
       <DragOverlay dropAnimation={null}>
         {activeRequest && <RequestCard request={activeRequest} overlay />}
