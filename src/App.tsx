@@ -7,7 +7,7 @@ import { ReserveDialog } from './components/ReserveDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { loadData } from './dataLoader';
 import type { AppData } from './dataLoader';
-import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyRequest, PendingReserve, Reservation } from './types';
+import type { Allocation, BandGridParams, CompositeRequest, DragPreview, FrequencyBand, FrequencyRequest, PendingReserve, Reservation } from './types';
 
 const DEFAULT_SNAP_MHZ = 0.00625;
 
@@ -39,6 +39,7 @@ export default function App() {
   const bandsRef = useRef<FrequencyBand[]>([]);
   const venuesRef = useRef<AppData['venues']>([]);
   const allRequestsRef = useRef<FrequencyRequest[]>([]);
+  const compositeRequestsRef = useRef<CompositeRequest[]>([]);
 
   const pointerXRef = useRef(0);
   const pointerYRef = useRef(0);
@@ -53,6 +54,7 @@ export default function App() {
       bandsRef.current = data.bands;
       venuesRef.current = data.venues;
       allRequestsRef.current = data.allRequests;
+      compositeRequestsRef.current = data.compositeRequests;
       setAppData(data);
       setSelectedVenueId(data.venues[0]?.id ?? '');
     }).catch(err => console.error('Failed to load spectrum data:', err));
@@ -120,7 +122,14 @@ export default function App() {
 
   const selectedVenue = appData?.venues.find(v => v.id === selectedVenueId) ?? appData?.venues[0];
   const allocatedIds = new Set(allocations.map(a => a.requestId));
-  const pendingRequests = selectedVenue?.requests.filter(r => !allocatedIds.has(r.id)) ?? [];
+
+  // Composite groups for the selected venue
+  const venueComposites = (appData?.compositeRequests ?? []).filter(c => c.venueId === selectedVenueId);
+  const compositeRequestIds = new Set(venueComposites.flatMap(c => c.memberRequests.map(r => r.id)));
+  // A composite stays "pending" until every member is allocated
+  const pendingCompositeGroups = venueComposites.filter(c => c.memberRequests.some(r => !allocatedIds.has(r.id)));
+  // Standalone pending requests — excludes composite members (those are shown inside their group card)
+  const pendingRequests = (selectedVenue?.requests ?? []).filter(r => !allocatedIds.has(r.id) && !compositeRequestIds.has(r.id));
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const req = allRequestsRef.current.find(r => r.id === event.active.id);
@@ -363,6 +372,8 @@ export default function App() {
           />
           <RequestPanel
             requests={pendingRequests}
+            compositeGroups={pendingCompositeGroups}
+            allocatedIds={allocatedIds}
             venues={appData.venues}
             services={appData.services}
             selectedVenueId={selectedVenueId}

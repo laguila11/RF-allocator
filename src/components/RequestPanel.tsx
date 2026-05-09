@@ -1,8 +1,11 @@
-import type { FrequencyRequest, Service, Venue } from '../types';
+import type { CompositeRequest, FrequencyRequest, Service, Venue } from '../types';
 import { RequestCard } from './RequestCard';
+import { CompositeCard } from './CompositeCard';
 
 interface Props {
   requests: FrequencyRequest[];
+  compositeGroups: CompositeRequest[];
+  allocatedIds: Set<string>;
   venues: Venue[];
   services: Service[];
   selectedVenueId: string;
@@ -35,13 +38,22 @@ const selectStyle: React.CSSProperties = {
 };
 
 export function RequestPanel({
-  requests, venues, services,
+  requests, compositeGroups, allocatedIds,
+  venues, services,
   selectedVenueId, selectedServiceId,
   onVenueChange, onServiceChange,
 }: Props) {
-  const filtered = selectedServiceId === 'all'
+  // Filter standalone requests by service
+  const filteredRequests = selectedServiceId === 'all'
     ? requests
     : requests.filter(r => r.serviceId === selectedServiceId);
+
+  // Composite groups appear under "All Services" or "Other Services"
+  const filteredComposites = selectedServiceId === 'all' || selectedServiceId === 'svc-other'
+    ? compositeGroups
+    : [];
+
+  const isEmpty = filteredRequests.length === 0 && filteredComposites.length === 0;
 
   return (
     <div style={{
@@ -88,21 +100,33 @@ export function RequestPanel({
           Pending Requests
         </div>
         <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
-          {filtered.length} unassigned · drag to place
+          {filteredRequests.length > 0 && `${filteredRequests.length} unassigned`}
+          {filteredRequests.length > 0 && filteredComposites.length > 0 && ' · '}
+          {filteredComposites.length > 0 && `${filteredComposites.length} bundle${filteredComposites.length > 1 ? 's' : ''} pending`}
+          {!isEmpty && ' · drag to place'}
+          {isEmpty && (requests.length === 0 && compositeGroups.length === 0 ? 'All requests assigned' : 'No requests for this service')}
         </div>
       </div>
 
       {/* Request list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-        {filtered.length === 0 ? (
+        {isEmpty ? (
           <div style={{ color: '#cbd5e1', fontSize: '12px', textAlign: 'center', marginTop: '40px', fontStyle: 'italic' }}>
-            {requests.length === 0 ? 'All requests assigned' : 'No requests for this service'}
+            {requests.length === 0 && compositeGroups.length === 0
+              ? 'All requests assigned'
+              : 'No requests for this service'}
           </div>
         ) : (
-          filtered.map(req => <RequestCard key={req.id} request={req} />)
+          <>
+            {filteredComposites.map(c => (
+              <CompositeCard key={c.id} composite={c} allocatedIds={allocatedIds} />
+            ))}
+            {filteredRequests.map(req => (
+              <RequestCard key={req.id} request={req} />
+            ))}
+          </>
         )}
       </div>
-
     </div>
   );
 }

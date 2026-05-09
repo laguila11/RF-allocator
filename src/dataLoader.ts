@@ -1,10 +1,11 @@
-import type { FrequencyBand, FrequencyRequest, Service, Venue } from './types';
+import type { CompositeRequest, FrequencyBand, FrequencyRequest, Service, Venue } from './types';
 
 export interface AppData {
   bands: FrequencyBand[];
   services: Service[];
   venues: Venue[];
   allRequests: FrequencyRequest[];
+  compositeRequests: CompositeRequest[];
 }
 
 function parseCSVLine(line: string): string[] {
@@ -46,11 +47,12 @@ function parseCSV(text: string): Record<string, string>[] {
 }
 
 export async function loadData(): Promise<AppData> {
-  const [bandsText, servicesText, venuesText, requestsText] = await Promise.all([
+  const [bandsText, servicesText, venuesText, requestsText, compositesText] = await Promise.all([
     fetch('/data/bands.csv').then(r => r.text()),
     fetch('/data/services.csv').then(r => r.text()),
     fetch('/data/venues.csv').then(r => r.text()),
     fetch('/data/requests.csv').then(r => r.text()),
+    fetch('/data/composite_requests.csv').then(r => r.text()),
   ]);
 
   const bands: FrequencyBand[] = parseCSV(bandsText).map(row => ({
@@ -63,33 +65,58 @@ export async function loadData(): Promise<AppData> {
     channelMHz: row.channelMHz ? parseFloat(row.channelMHz) : undefined,
   }));
 
+  const allBandIds = bands.map(b => b.id);
+
   const services: Service[] = parseCSV(servicesText).map(row => ({
     id: row.id,
     name: row.name,
     color: row.color,
-    bandIds: row.bandIds.split(';').map(s => s.trim()).filter(Boolean),
+    // '*' expands to all band IDs (used by Other Services to cover the full spectrum)
+    bandIds: row.bandIds === '*' ? allBandIds : row.bandIds.split(';').map(s => s.trim()).filter(Boolean),
+    duplexOffsetMHz: row.duplexOffsetMHz ? parseFloat(row.duplexOffsetMHz) : undefined,
   }));
 
-  const serviceColorMap = Object.fromEntries(services.map(s => [s.id, s.color]));
+  const serviceMap = new Map(services.map(s => [s.id, s]));
 
-  const venueRows = parseCSV(venuesText);
-  const requestRows = parseCSV(requestsText);
+  // ── Composite group stubs ─────────────────────────────────────────────────
+  const compositeRequests: CompositeRequest[] = parseCSV(compositesText).map(row => ({
+    id: row.id,
+    label: row.label,
+    description: row.description,
+    serviceId: row.serviceId,
+    venueId: row.venueId,
+    memberRequests: [],
+  }));
+  const compositeMap = new Map(compositeRequests.map(c => [c.id, c]));
 
+  // ── Requests ──────────────────────────────────────────────────────────────
   const venueRequestMap = new Map<string, FrequencyRequest[]>();
-  for (const row of requestRows) {
+
+  for (const row of parseCSV(requestsText)) {
+    const svc = serviceMap.get(row.serviceId);
     const req: FrequencyRequest = {
       id: row.id,
       label: row.label,
       device: row.device,
       bandwidthMHz: parseFloat(row.bandwidthMHz),
       serviceId: row.serviceId,
-      color: serviceColorMap[row.serviceId] ?? '#94a3b8',
-      duplexOffsetMHz: row.duplexOffsetMHz ? parseFloat(row.duplexOffsetMHz) : undefined,
+      color: svc?.color ?? '#94a3b8',
+      // Duplex offset comes from the service definition, not the individual request
+      duplexOffsetMHz: svc?.duplexOffsetMHz,
+      compositeId: row.compositeId || undefined,
     };
+
+    // Attach to composite group if referenced
+    if (req.compositeId) {
+      compositeMap.get(req.compositeId)?.memberRequests.push(req);
+    }
+
+    // Also add to venue's request list (so it can be allocated via drag-and-drop)
     if (!venueRequestMap.has(row.venueId)) venueRequestMap.set(row.venueId, []);
     venueRequestMap.get(row.venueId)!.push(req);
   }
 
+  const venueRows = parseCSV(venuesText);
   const venues: Venue[] = venueRows.map(row => ({
     id: row.id,
     name: row.name,
@@ -98,5 +125,5 @@ export async function loadData(): Promise<AppData> {
 
   const allRequests = venues.flatMap(v => v.requests);
 
-  return { bands, services, venues, allRequests };
+  return { bands, services, venues, allRequests, compositeRequests };
 }

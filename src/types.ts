@@ -16,6 +16,7 @@ export interface FrequencyRequest {
   color: string;
   serviceId: string;
   duplexOffsetMHz?: number;
+  compositeId?: string; // if set, belongs to a composite request group
 }
 
 export interface Service {
@@ -23,6 +24,16 @@ export interface Service {
   name: string;
   color: string;
   bandIds: string[];
+  duplexOffsetMHz?: number; // inherited by all requests of this service
+}
+
+export interface CompositeRequest {
+  id: string;
+  label: string;
+  description: string;
+  serviceId: string;
+  venueId: string;
+  memberRequests: FrequencyRequest[];
 }
 
 export interface Venue {

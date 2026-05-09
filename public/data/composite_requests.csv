@@ -1,0 +1,4 @@
+id,label,description,serviceId,venueId
+comp-oc-fp-01,Field Producer Kit,Complete RF package for field producer (mic + IEM + radio),svc-other,opening-ceremony
+comp-ath-photo-01,Photo / Media Bundle,Photo trigger and WLAN bundle for media team,svc-other,athletics
+comp-ibc-rep-01,Reporter Bundle,Full RF package for on-air correspondent (mic + IEM + radio),svc-other,ibc-media
