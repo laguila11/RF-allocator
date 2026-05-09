@@ -3,7 +3,6 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@
 import type { DragEndEvent, DragMoveEvent, DragStartEvent } from '@dnd-kit/core';
 import { SpectrumView } from './components/SpectrumView';
 import { RequestPanel } from './components/RequestPanel';
-import { RequestCard } from './components/RequestCard';
 import { ReserveDialog } from './components/ReserveDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { initialBands, venues, allRequests, services } from './data';
@@ -97,7 +96,7 @@ export default function App() {
     const maxStart = req.duplexOffsetMHz !== undefined
       ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
       : band.endMHz - req.bandwidthMHz;
-    const startMHz = Math.max(band.startMHz, Math.min(Math.round(rawFreq / snapMHz) * snapMHz, maxStart));
+    const startMHz = Math.max(band.startMHz, Math.min(Math.floor(rawFreq / snapMHz) * snapMHz, maxStart));
     const endMHz = Math.round((startMHz + req.bandwidthMHz) * 1000) / 1000;
     return { band, startMHz, endMHz };
   }, []);
@@ -398,9 +397,7 @@ export default function App() {
         />
       )}
 
-      <DragOverlay dropAnimation={null}>
-        {activeRequest && <RequestCard request={activeRequest} overlay />}
-      </DragOverlay>
+      <DragOverlay dropAnimation={null} />
     </DndContext>
   );
 }

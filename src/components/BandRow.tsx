@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyRequest, Reservation } from '../types';
 
-const CELL_MIN_PX = 6;
-const CELL_MAX_HEIGHT = 40;
+const CELL_MIN_PX = 12;
+const CELL_MAX_HEIGHT = 48;
 const CELL_GAP = 1;
 const MAX_CELLS = 512;
 
