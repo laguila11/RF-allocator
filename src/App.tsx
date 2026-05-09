@@ -1,60 +1,93 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import type { DragEndEvent, DragMoveEvent, DragStartEvent } from '@dnd-kit/core';
 import { SpectrumView } from './components/SpectrumView';
 import { RequestPanel } from './components/RequestPanel';
 import { RequestCard } from './components/RequestCard';
-import { initialBands, initialRequests } from './data';
-import type { Allocation, FrequencyRequest } from './types';
-
-function findFirstAvailableSlot(
-  bandStart: number,
-  bandEnd: number,
-  existing: Allocation[],
-  bw: number,
-): number | null {
-  const STEP = 0.025;
-  for (
-    let freq = bandStart;
-    Math.round((freq + bw) * 1000) / 1000 <= bandEnd + 1e-9;
-    freq = Math.round((freq + STEP) * 1000) / 1000
-  ) {
-    const end = Math.round((freq + bw) * 1000) / 1000;
-    const conflict = existing.some(a => !(end <= a.startMHz || freq >= a.endMHz));
-    if (!conflict) return freq;
-  }
-  return null;
-}
+import { initialBands, venues, allRequests } from './data';
+import type { Allocation, DragPreview, FrequencyRequest } from './types';
 
 export default function App() {
-  const [pendingRequests, setPendingRequests] = useState<FrequencyRequest[]>(initialRequests);
+  const [selectedVenueId, setSelectedVenueId] = useState(venues[0].id);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [activeRequest, setActiveRequest] = useState<FrequencyRequest | null>(null);
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const pointerXRef = useRef(0);
+  const bandStripRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  useEffect(() => {
+    const track = (e: PointerEvent) => { pointerXRef.current = e.clientX; };
+    window.addEventListener('pointermove', track);
+    return () => window.removeEventListener('pointermove', track);
+  }, []);
+
+  const registerBandStrip = useCallback((bandId: string, el: HTMLElement | null) => {
+    if (el) bandStripRefs.current.set(bandId, el);
+    else bandStripRefs.current.delete(bandId);
+  }, []);
+
+  const calcDropPosition = useCallback((bandId: string, req: FrequencyRequest) => {
+    const band = initialBands.find(b => b.id === bandId);
+    const stripEl = bandStripRefs.current.get(bandId);
+    if (!band || !stripEl) return null;
+    const rect = stripEl.getBoundingClientRect();
+    const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width));
+    const rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+    const startMHz = Math.max(
+      band.startMHz,
+      Math.min(Math.round(rawFreq / 0.025) * 0.025, band.endMHz - req.bandwidthMHz),
+    );
+    const endMHz = Math.round((startMHz + req.bandwidthMHz) * 1000) / 1000;
+    return { band, startMHz, endMHz };
+  }, []);
+
+  const selectedVenue = venues.find(v => v.id === selectedVenueId)!;
+  const allocatedIds = new Set(allocations.map(a => a.requestId));
+  const pendingRequests = selectedVenue.requests.filter(r => !allocatedIds.has(r.id));
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const req = pendingRequests.find(r => r.id === event.active.id);
+    const req = allRequests.find(r => r.id === event.active.id);
     setActiveRequest(req ?? null);
-  }, [pendingRequests]);
+  }, []);
+
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const { over } = event;
+    if (!over || !activeRequest) { setDragPreview(null); return; }
+    const pos = calcDropPosition(over.id as string, activeRequest);
+    if (!pos) { setDragPreview(null); return; }
+    const { band, startMHz, endMHz } = pos;
+    const existing = allocations.filter(a => a.bandId === band.id);
+    const valid = !existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
+    setDragPreview({ bandId: band.id, startMHz, endMHz, valid });
+  }, [activeRequest, allocations, calcDropPosition]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveRequest(null);
+    setDragPreview(null);
     const { active, over } = event;
     if (!over) return;
 
-    const req = pendingRequests.find(r => r.id === active.id);
+    const req = allRequests.find(r => r.id === active.id);
     if (!req) return;
 
-    const band = initialBands.find(b => b.id === over.id);
-    if (!band) return;
+    const currentAllocatedIds = new Set(allocations.map(a => a.requestId));
+    if (currentAllocatedIds.has(req.id)) return;
+
+    const venueOfReq = venues.find(v => v.requests.some(r => r.id === req.id));
+    if (!venueOfReq) return;
+
+    const pos = calcDropPosition(over.id as string, req);
+    if (!pos) return;
+    const { band, startMHz, endMHz } = pos;
 
     const existing = allocations.filter(a => a.bandId === band.id);
-    const startMHz = findFirstAvailableSlot(band.startMHz, band.endMHz, existing, req.bandwidthMHz);
-
-    if (startMHz === null) {
-      setErrorMsg(`No space for ${req.label} in ${band.name}`);
+    const conflict = existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
+    if (conflict) {
+      setErrorMsg(`Conflict: ${req.label} overlaps an existing allocation`);
       setTimeout(() => setErrorMsg(null), 3500);
       return;
     }
@@ -64,36 +97,31 @@ export default function App() {
       requestId: req.id,
       bandId: band.id,
       startMHz,
-      endMHz: Math.round((startMHz + req.bandwidthMHz) * 1000) / 1000,
+      endMHz,
+      venueId: venueOfReq.id,
     }]);
-    setPendingRequests(prev => prev.filter(r => r.id !== req.id));
-  }, [pendingRequests, allocations]);
+  }, [allocations, calcDropPosition]);
 
   const handleDeallocate = useCallback((allocationId: string) => {
-    const alloc = allocations.find(a => a.id === allocationId);
-    if (!alloc) return;
-    const req = initialRequests.find(r => r.id === alloc.requestId);
-    if (!req) return;
     setAllocations(prev => prev.filter(a => a.id !== allocationId));
-    setPendingRequests(prev => [...prev, req]);
-  }, [allocations]);
+  }, []);
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
+    >
       <div style={{
         display: 'flex', flexDirection: 'column', height: '100vh',
         backgroundColor: '#0a0f1e',
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}>
         <header style={{
-          padding: '0 24px',
-          height: '52px',
-          backgroundColor: '#0f172a',
-          borderBottom: '1px solid #1e293b',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px',
-          flexShrink: 0,
+          padding: '0 24px', height: '52px',
+          backgroundColor: '#0f172a', borderBottom: '1px solid #1e293b',
+          display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
@@ -110,12 +138,8 @@ export default function App() {
           {errorMsg && (
             <div style={{
               marginLeft: 'auto',
-              backgroundColor: '#450a0a',
-              border: '1px solid #991b1b',
-              color: '#fca5a5',
-              padding: '5px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
+              backgroundColor: '#450a0a', border: '1px solid #991b1b',
+              color: '#fca5a5', padding: '5px 12px', borderRadius: '6px', fontSize: '12px',
             }}>
               {errorMsg}
             </div>
@@ -125,11 +149,19 @@ export default function App() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 256px', flex: 1, overflow: 'hidden' }}>
           <SpectrumView
             bands={initialBands}
-            allRequests={initialRequests}
+            allRequests={allRequests}
             allocations={allocations}
+            venues={venues}
+            dragPreview={dragPreview}
             onDeallocate={handleDeallocate}
+            onRegisterStrip={registerBandStrip}
           />
-          <RequestPanel requests={pendingRequests} />
+          <RequestPanel
+            requests={pendingRequests}
+            venues={venues}
+            selectedVenueId={selectedVenueId}
+            onVenueChange={setSelectedVenueId}
+          />
         </div>
       </div>
 

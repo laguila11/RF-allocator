@@ -15,10 +15,24 @@ export interface FrequencyRequest {
   color: string;
 }
 
+export interface Venue {
+  id: string;
+  name: string;
+  requests: FrequencyRequest[];
+}
+
 export interface Allocation {
   id: string;
   requestId: string;
   bandId: string;
   startMHz: number;
   endMHz: number;
+  venueId: string;
+}
+
+export interface DragPreview {
+  bandId: string;
+  startMHz: number;
+  endMHz: number;
+  valid: boolean;
 }

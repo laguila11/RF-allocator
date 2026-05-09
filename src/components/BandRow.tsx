@@ -1,5 +1,6 @@
+import { useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import type { Allocation, FrequencyBand, FrequencyRequest } from '../types';
+import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Venue } from '../types';
 import { AllocationBlock } from './AllocationBlock';
 
 const STRIP_WIDTH = 680;
@@ -13,16 +14,26 @@ interface Props {
   band: FrequencyBand;
   allocations: Allocation[];
   allRequests: FrequencyRequest[];
+  venues: Venue[];
+  dragPreview: DragPreview | null;
   onDeallocate: (allocationId: string) => void;
+  onRegisterStrip: (bandId: string, el: HTMLElement | null) => void;
 }
 
-export function BandRow({ band, allocations, allRequests, onDeallocate }: Props) {
+export function BandRow({ band, allocations, allRequests, venues, dragPreview, onDeallocate, onRegisterStrip }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: band.id });
+
+  const setRef = useCallback((el: HTMLElement | null) => {
+    setNodeRef(el);
+    onRegisterStrip(band.id, el);
+  }, [band.id, setNodeRef, onRegisterStrip]);
 
   const bandRange = band.endMHz - band.startMHz;
   const usedBW = allocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
   const utilizationPct = Math.round((usedBW / bandRange) * 100);
   const ticks = generateTicks(band.startMHz, band.endMHz, 7);
+
+  const preview = dragPreview?.bandId === band.id ? dragPreview : null;
 
   return (
     <div style={{ marginBottom: '28px' }}>
@@ -36,7 +47,7 @@ export function BandRow({ band, allocations, allRequests, onDeallocate }: Props)
       </div>
 
       <div
-        ref={setNodeRef}
+        ref={setRef}
         style={{
           position: 'relative',
           width: `${STRIP_WIDTH}px`,
@@ -49,24 +60,40 @@ export function BandRow({ band, allocations, allRequests, onDeallocate }: Props)
           overflow: 'hidden',
         }}
       >
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundColor: band.color, opacity: 0.04, pointerEvents: 'none',
-        }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: band.color, opacity: 0.04, pointerEvents: 'none' }} />
 
-        {allocations.length === 0 && (
+        {allocations.length === 0 && !preview && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#1e293b', fontSize: '12px', pointerEvents: 'none',
-            fontStyle: 'italic',
+            color: '#1e293b', fontSize: '12px', pointerEvents: 'none', fontStyle: 'italic',
           }}>
             Drop requests here
           </div>
         )}
 
+        {/* Drag preview ghost */}
+        {preview && (() => {
+          const left = ((preview.startMHz - band.startMHz) / bandRange) * STRIP_WIDTH;
+          const width = ((preview.endMHz - preview.startMHz) / bandRange) * STRIP_WIDTH;
+          return (
+            <div style={{
+              position: 'absolute',
+              left: `${left}px`,
+              width: `${Math.max(width, 28)}px`,
+              top: '4px', bottom: '4px',
+              backgroundColor: preview.valid ? '#22c55e' : '#ef4444',
+              opacity: 0.35,
+              borderRadius: '4px',
+              border: `2px dashed ${preview.valid ? '#4ade80' : '#f87171'}`,
+              pointerEvents: 'none',
+            }} />
+          );
+        })()}
+
         {allocations.map(alloc => {
           const req = allRequests.find(r => r.id === alloc.requestId);
+          const venueName = venues.find(v => v.id === alloc.venueId)?.name ?? '';
           if (!req) return null;
           return (
             <AllocationBlock
@@ -74,6 +101,7 @@ export function BandRow({ band, allocations, allRequests, onDeallocate }: Props)
               allocation={alloc}
               band={band}
               request={req}
+              venueName={venueName}
               stripWidth={STRIP_WIDTH}
               onDeallocate={onDeallocate}
             />

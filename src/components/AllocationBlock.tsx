@@ -4,11 +4,12 @@ interface Props {
   allocation: Allocation;
   band: FrequencyBand;
   request: FrequencyRequest;
+  venueName: string;
   stripWidth: number;
   onDeallocate: (allocationId: string) => void;
 }
 
-export function AllocationBlock({ allocation, band, request, stripWidth, onDeallocate }: Props) {
+export function AllocationBlock({ allocation, band, request, venueName, stripWidth, onDeallocate }: Props) {
   const bandRange = band.endMHz - band.startMHz;
   const left = ((allocation.startMHz - band.startMHz) / bandRange) * stripWidth;
   const width = ((allocation.endMHz - allocation.startMHz) / bandRange) * stripWidth;
@@ -18,14 +19,13 @@ export function AllocationBlock({ allocation, band, request, stripWidth, onDeall
 
   return (
     <div
-      title={`${request.label} — ${request.device}\n${allocation.startMHz.toFixed(3)}–${allocation.endMHz.toFixed(3)} MHz  (${bwLabel})\nClick to unassign`}
+      title={`${request.label} — ${request.device}\n${venueName}\n${allocation.startMHz.toFixed(3)}–${allocation.endMHz.toFixed(3)} MHz  (${bwLabel})\nClick to unassign`}
       onClick={() => onDeallocate(allocation.id)}
       style={{
         position: 'absolute',
         left: `${left}px`,
         width: `${Math.max(width, 28)}px`,
-        top: '4px',
-        bottom: '4px',
+        top: '4px', bottom: '4px',
         backgroundColor: request.color,
         borderRadius: '4px',
         display: 'flex',
