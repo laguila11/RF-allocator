@@ -42,19 +42,18 @@ export function SpectrumView({
         return svc ? bands.filter(b => svc.bandIds.includes(b.id)) : bands;
       })();
 
-  // Stats: total spectrum from visible bands; used from current venue's allocations in those bands
+  // Each venue has its own independent spectrum plan
+  const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId);
+
+  // Stats: total spectrum from visible bands; used from this venue's allocations in those bands
   const visibleBandIds = new Set(visibleBands.map(b => b.id));
   const totalBW = visibleBands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
-  const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId && visibleBandIds.has(a.bandId));
-  const usedBW = venueAllocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
+  const usedBW = venueAllocations.filter(a => visibleBandIds.has(a.bandId)).reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
   const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
 
   const activeService = selectedServiceId !== 'all'
     ? services.find(s => s.id === selectedServiceId) ?? null
     : null;
-
-  // Each venue has its own independent spectrum plan — only show this venue's allocations
-  const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId);
 
   const bandRow = (band: FrequencyBand) => (
     <BandRow
