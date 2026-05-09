@@ -8,9 +8,12 @@ const STRIP_HEIGHT = 88;
 const DEFAULT_SNAP_MHZ = 0.006;
 
 function gridSteps(range: number) {
-  if (range >= 30) return { major: 5, minor: 1 };
-  if (range >= 10) return { major: 2, minor: 0.5 };
-  return { major: 1, minor: 0.2 };
+  if (range >= 500) return { major: 100, minor: 20  };
+  if (range >= 200) return { major: 50,  minor: 10  };
+  if (range >= 100) return { major: 20,  minor: 5   };
+  if (range >= 30)  return { major: 5,   minor: 1   };
+  if (range >= 10)  return { major: 2,   minor: 0.5 };
+  return                   { major: 1,   minor: 0.2 };
 }
 
 function buildGridLines(start: number, end: number, width: number) {
@@ -28,11 +31,35 @@ function buildGridLines(start: number, end: number, width: number) {
 
 function generateTicks(start: number, end: number): number[] {
   const range = end - start;
-  const step = range >= 30 ? 5 : 1;
+  const step = range >= 500 ? 100 : range >= 200 ? 50 : range >= 100 ? 20 : range >= 30 ? 5 : 1;
   const ticks: number[] = [];
   let f = Math.ceil(start / step) * step;
   while (f <= end) { ticks.push(f); f += step; }
   return ticks;
+}
+
+// Format a frequency value for tick labels and headers
+function fmtMHz(mhz: number): string {
+  if (mhz >= 3000) {
+    const g = mhz / 1000;
+    return `${g % 1 === 0 ? g.toFixed(1) : g.toFixed(2).replace(/0+$/, '')} GHz`;
+  }
+  return `${mhz} MHz`;
+}
+
+function fmtBandRange(start: number, end: number): string {
+  if (start >= 3000) {
+    const fmt = (v: number) => {
+      const g = v / 1000;
+      return (g % 1 === 0 ? g.toFixed(1) : g.toFixed(3).replace(/\.?0+$/, ''));
+    };
+    return `${fmt(start)}–${fmt(end)} GHz`;
+  }
+  return `${start}–${end} MHz`;
+}
+
+function fmtBW(bwMHz: number): string {
+  return bwMHz >= 1 ? `${bwMHz.toFixed(bwMHz % 1 === 0 ? 0 : 1)} MHz` : `${Math.round(bwMHz * 1000)} kHz`;
 }
 
 interface Props {
@@ -148,10 +175,10 @@ export function BandRow({
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
         <div style={{ width: '4px', height: '20px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
         <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '14px' }}>{band.name}</span>
-        <span style={{ color: '#94a3b8', fontSize: '12px' }}>{band.startMHz}–{band.endMHz} MHz</span>
+        <span style={{ color: '#94a3b8', fontSize: '12px' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
         <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '11px' }}>
           {allocations.length} assigned · {utilizationPct}% used
-          {reservedBW > 0 && ` · ${Math.round(reservedBW * 1000)} kHz reserved`}
+          {reservedBW > 0 && ` · ${fmtBW(reservedBW)} reserved`}
         </span>
       </div>
 
@@ -302,7 +329,7 @@ export function BandRow({
           return (
             <div key={tick} style={{ position: 'absolute', left: `${left}px`, transform: 'translateX(-50%)', textAlign: 'center' }}>
               <div style={{ width: '1px', height: '4px', backgroundColor: '#cbd5e1', margin: '0 auto' }} />
-              <div style={{ color: '#94a3b8', fontSize: '10px', whiteSpace: 'nowrap', marginTop: '1px' }}>{tick}</div>
+              <div style={{ color: '#94a3b8', fontSize: '10px', whiteSpace: 'nowrap', marginTop: '1px' }}>{fmtMHz(tick)}</div>
             </div>
           );
         })}
