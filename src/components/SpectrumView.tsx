@@ -1,8 +1,9 @@
-import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Reservation, Venue } from '../types';
+import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Reservation, Service, Venue } from '../types';
 import { BandRow } from './BandRow';
 
 interface Props {
   bands: FrequencyBand[];
+  services: Service[];
   allRequests: FrequencyRequest[];
   allocations: Allocation[];
   reservations: Reservation[];
@@ -28,7 +29,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 export function SpectrumView({
-  bands, allRequests, allocations, reservations, venues,
+  bands, services, allRequests, allocations, reservations, venues,
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onReserveRequest,
 }: Props) {
   const totalBW = bands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
@@ -44,21 +45,57 @@ export function SpectrumView({
         <Stat label="Utilization" value={`${utilizationPct}%`} accent />
       </div>
 
-      {bands.map(band => (
-        <BandRow
-          key={band.id}
-          band={band}
-          allocations={allocations.filter(a => a.bandId === band.id)}
-          reservations={reservations.filter(r => r.bandId === band.id)}
-          allRequests={allRequests}
-          venues={venues}
-          dragPreview={dragPreview}
-          onDeallocate={onDeallocate}
-          onRemoveReservation={onRemoveReservation}
-          onRegisterStrip={onRegisterStrip}
-          onReserveRequest={onReserveRequest}
-        />
-      ))}
+      {services.map(service => {
+        const serviceBands = bands.filter(b => service.bandIds.includes(b.id));
+        if (serviceBands.length === 0) return null;
+        return (
+          <div key={service.id} style={{ marginBottom: '36px' }}>
+            {/* Service header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              marginBottom: '16px', paddingBottom: '10px',
+              borderBottom: `2px solid ${service.color}33`,
+            }}>
+              <div style={{
+                width: '10px', height: '10px', borderRadius: '3px',
+                backgroundColor: service.color, flexShrink: 0,
+              }} />
+              <span style={{
+                color: '#1e293b', fontWeight: '700', fontSize: '13px',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                {service.name}
+              </span>
+              <div style={{
+                height: '1px', flex: 1, backgroundColor: `${service.color}22`,
+              }} />
+              <span style={{
+                fontSize: '11px', color: service.color, fontWeight: '600',
+                backgroundColor: `${service.color}12`,
+                padding: '2px 8px', borderRadius: '4px',
+              }}>
+                {serviceBands.map(b => b.name).join(' · ')}
+              </span>
+            </div>
+
+            {serviceBands.map(band => (
+              <BandRow
+                key={band.id}
+                band={band}
+                allocations={allocations.filter(a => a.bandId === band.id)}
+                reservations={reservations.filter(r => r.bandId === band.id)}
+                allRequests={allRequests}
+                venues={venues}
+                dragPreview={dragPreview}
+                onDeallocate={onDeallocate}
+                onRemoveReservation={onRemoveReservation}
+                onRegisterStrip={onRegisterStrip}
+                onReserveRequest={onReserveRequest}
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

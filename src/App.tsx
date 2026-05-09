@@ -5,10 +5,18 @@ import { SpectrumView } from './components/SpectrumView';
 import { RequestPanel } from './components/RequestPanel';
 import { RequestCard } from './components/RequestCard';
 import { ReserveDialog } from './components/ReserveDialog';
-import { initialBands, venues, allRequests } from './data';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { initialBands, venues, allRequests, services } from './data';
 import type { Allocation, DragPreview, FrequencyRequest, PendingReserve, Reservation } from './types';
 
 const SNAP_MHZ = 0.006;
+
+interface ConfirmState {
+  title: string;
+  detail: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
 
 function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
   return !(aEnd <= bStart || aStart >= bEnd);
@@ -23,6 +31,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pendingReserve, setPendingReserve] = useState<PendingReserve | null>(null);
   const [lastReservationId, setLastReservationId] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const pointerXRef = useRef(0);
   const pointerYRef = useRef(0);
@@ -31,7 +40,6 @@ export default function App() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  // Track pointer position (used for both drop position and tooltip)
   useEffect(() => {
     const track = (e: PointerEvent) => {
       pointerXRef.current = e.clientX;
@@ -41,7 +49,6 @@ export default function App() {
     return () => window.removeEventListener('pointermove', track);
   }, []);
 
-  // Keep tooltip DOM position in sync with pointer during drag (no React re-render needed)
   useEffect(() => {
     if (!activeRequest) return;
     const move = (e: PointerEvent) => {
@@ -163,13 +170,45 @@ export default function App() {
   }, [allocations, reservations, calcDropPosition]);
 
   const handleDeallocate = useCallback((allocationId: string) => {
-    setAllocations(prev => {
-      const target = prev.find(a => a.id === allocationId);
-      if (!target) return prev;
-      if (target.pairId) return prev.filter(a => a.pairId !== target.pairId);
-      return prev.filter(a => a.id !== allocationId);
+    const target = allocations.find(a => a.id === allocationId);
+    if (!target) return;
+    const req = allRequests.find(r => r.id === target.requestId);
+    const roleLabel = target.pairRole === 'primary' ? ' [TX]' : target.pairRole === 'secondary' ? ' [RX]' : '';
+    const label = req ? `${req.label}${roleLabel}` : allocationId;
+    const deviceLine = req ? `${req.device}\n` : '';
+    const detail = `${label}\n${deviceLine}${target.startMHz.toFixed(3)}–${target.endMHz.toFixed(3)} MHz`;
+    const title = target.pairId ? 'Remove Duplex Pair' : 'Remove Allocation';
+    setConfirmState({
+      title,
+      detail: target.pairId
+        ? `${req?.label ?? ''} (TX + RX pair)\n${req?.device ?? ''}\nBoth channels will be removed`
+        : detail,
+      confirmLabel: 'Remove',
+      onConfirm: () => {
+        setAllocations(prev => {
+          if (target.pairId) return prev.filter(a => a.pairId !== target.pairId);
+          return prev.filter(a => a.id !== allocationId);
+        });
+        setConfirmState(null);
+      },
     });
-  }, []);
+  }, [allocations]);
+
+  const handleRemoveReservation = useCallback((id: string) => {
+    const res = reservations.find(r => r.id === id);
+    if (!res) return;
+    const bwkHz = Math.round((res.endMHz - res.startMHz) * 1000);
+    setConfirmState({
+      title: 'Remove Reservation',
+      detail: `${res.reason}\n${res.startMHz.toFixed(3)}–${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
+      confirmLabel: 'Remove',
+      onConfirm: () => {
+        setReservations(prev => prev.filter(r => r.id !== id));
+        setLastReservationId(prev => (prev === id ? null : prev));
+        setConfirmState(null);
+      },
+    });
+  }, [reservations]);
 
   const handleReserveRequest = useCallback((bandId: string, startMHz: number, endMHz: number) => {
     setPendingReserve({ bandId, startMHz, endMHz });
@@ -183,16 +222,22 @@ export default function App() {
     setPendingReserve(null);
   }, [pendingReserve]);
 
-  const handleRemoveReservation = useCallback((id: string) => {
-    setReservations(prev => prev.filter(r => r.id !== id));
-    setLastReservationId(prev => (prev === id ? null : prev));
-  }, []);
-
   const handleUndoLastReservation = useCallback(() => {
     if (!lastReservationId) return;
-    setReservations(prev => prev.filter(r => r.id !== lastReservationId));
-    setLastReservationId(null);
-  }, [lastReservationId]);
+    const res = reservations.find(r => r.id === lastReservationId);
+    if (!res) return;
+    const bwkHz = Math.round((res.endMHz - res.startMHz) * 1000);
+    setConfirmState({
+      title: 'Undo Reservation',
+      detail: `${res.reason}\n${res.startMHz.toFixed(3)}–${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
+      confirmLabel: 'Undo',
+      onConfirm: () => {
+        setReservations(prev => prev.filter(r => r.id !== lastReservationId));
+        setLastReservationId(null);
+        setConfirmState(null);
+      },
+    });
+  }, [lastReservationId, reservations]);
 
   return (
     <DndContext
@@ -250,6 +295,7 @@ export default function App() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 264px', flex: 1, overflow: 'hidden' }}>
           <SpectrumView
             bands={initialBands}
+            services={services}
             allRequests={allRequests}
             allocations={allocations}
             reservations={reservations}
@@ -263,6 +309,7 @@ export default function App() {
           <RequestPanel
             requests={pendingRequests}
             venues={venues}
+            services={services}
             selectedVenueId={selectedVenueId}
             onVenueChange={setSelectedVenueId}
           />
@@ -313,6 +360,16 @@ export default function App() {
           pending={pendingReserve}
           onConfirm={handleReserveConfirm}
           onCancel={() => setPendingReserve(null)}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          detail={confirmState.detail}
+          confirmLabel={confirmState.confirmLabel}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
         />
       )}
 

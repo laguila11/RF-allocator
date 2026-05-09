@@ -13,7 +13,15 @@ export interface FrequencyRequest {
   bandwidthMHz: number;
   priority: 'high' | 'medium' | 'low';
   color: string;
+  serviceId: string;
   duplexOffsetMHz?: number;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  color: string;
+  bandIds: string[];
 }
 
 export interface Venue {
