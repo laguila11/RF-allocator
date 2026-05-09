@@ -4,8 +4,8 @@ import type { Allocation, DragPreview, FrequencyBand, FrequencyRequest, Reservat
 import { AllocationBlock } from './AllocationBlock';
 import { ReservationBlock } from './ReservationBlock';
 
-const STRIP_HEIGHT = 88;
-const DEFAULT_SNAP_MHZ = 0.006;
+const STRIP_HEIGHT = 48;
+const DEFAULT_SNAP_MHZ = 0.00625;
 
 function gridSteps(range: number) {
   if (range >= 500) return { major: 100, minor: 20  };
@@ -163,6 +163,17 @@ export function BandRow({
   const ticks = generateTicks(band.startMHz, band.endMHz);
   const preview = dragPreview?.bandId === band.id ? dragPreview : null;
 
+  // Cell-grid mode: render discrete channel cells as CSS background
+  const channelMHz = band.channelMHz ?? DEFAULT_SNAP_MHZ;
+  const cellWidthPx = stripWidth > 0 ? (channelMHz / bandRange) * stripWidth : 0;
+  const showCellGrid = cellWidthPx >= 4;
+  const cellGridStyle: React.CSSProperties = showCellGrid ? {
+    backgroundImage: [
+      `repeating-linear-gradient(to right, rgba(203,213,225,0.5) 0, rgba(203,213,225,0.5) 1px, transparent 1px, transparent ${cellWidthPx}px)`,
+      `repeating-linear-gradient(to bottom, rgba(203,213,225,0.2) 0, rgba(203,213,225,0.2) 1px, transparent 1px, transparent 8px)`,
+    ].join(', '),
+  } : {};
+
   const pairGroups: Record<string, Allocation[]> = {};
   for (const a of allocations) {
     if (a.pairId) {
@@ -172,12 +183,12 @@ export function BandRow({
   }
 
   return (
-    <div style={{ marginBottom: '32px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-        <div style={{ width: '4px', height: '20px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
-        <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '14px' }}>{band.name}</span>
-        <span style={{ color: '#94a3b8', fontSize: '12px' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
-        <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '11px' }}>
+    <div style={{ marginBottom: '18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <div style={{ width: '3px', height: '14px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
+        <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '12px' }}>{band.name}</span>
+        <span style={{ color: '#94a3b8', fontSize: '11px' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
+        <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '10px' }}>
           {allocations.length} assigned · {utilizationPct}% used
           {reservedBW > 0 && ` · ${fmtBW(reservedBW)} reserved`}
         </span>
@@ -200,13 +211,14 @@ export function BandRow({
           transition: 'background-color 0.1s, border-color 0.1s, box-shadow 0.1s',
           overflow: 'hidden',
           cursor: 'crosshair',
+          ...cellGridStyle,
         }}
       >
         {/* Band tint */}
         <div style={{ position: 'absolute', inset: 0, backgroundColor: band.color, opacity: 0.03, pointerEvents: 'none' }} />
 
-        {/* Grid lines */}
-        {gridLines.map(({ left, major }, i) => (
+        {/* Grid lines — only for narrow-channel bands where cell grid is not visible */}
+        {!showCellGrid && gridLines.map(({ left, major }, i) => (
           <div key={i} style={{
             position: 'absolute', left: `${left}px`, top: 0, bottom: 0, width: '1px',
             backgroundColor: major ? '#94a3b8' : '#e2e8f0',
@@ -252,7 +264,7 @@ export function BandRow({
             blocks.push(
               <div key={key} style={{
                 position: 'absolute', left: `${l}px`, width: `${w}px`,
-                top: '6px', bottom: '6px',
+                top: '3px', bottom: '3px',
                 backgroundColor: color, opacity: 0.18,
                 borderRadius: '4px', border: `2px dashed ${color}`,
                 pointerEvents: 'none',
@@ -267,7 +279,7 @@ export function BandRow({
             if (x2 > x1) blocks.push(
               <div key="conn" style={{
                 position: 'absolute', left: `${x1}px`, width: `${x2 - x1}px`,
-                bottom: '10px', height: '2px',
+                bottom: '6px', height: '2px',
                 backgroundColor: color, opacity: 0.4, pointerEvents: 'none',
               }} />
             );
@@ -287,7 +299,7 @@ export function BandRow({
           return (
             <div key={`conn-${a.pairId}`} style={{
               position: 'absolute', left: `${x1}px`, width: `${x2 - x1}px`,
-              bottom: '8px', height: '2px',
+              bottom: '5px', height: '2px',
               backgroundColor: req.color, opacity: 0.4, pointerEvents: 'none',
             }} />
           );

@@ -5,6 +5,7 @@ export interface FrequencyBand {
   endMHz: number;
   color: string;
   snapMHz?: number;
+  channelMHz?: number; // minimum allocatable channel width; drives grid cell size
 }
 
 export interface FrequencyRequest {

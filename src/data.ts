@@ -34,38 +34,38 @@ export function getRequestColor(venueId: string, serviceId: string): string {
 // Bands are non-overlapping, ordered by frequency.
 // ─────────────────────────────────────────────────────────────────────────────
 export const initialBands: FrequencyBand[] = [
-  // §3.1 PLMR Table 1 — VHF Low
-  { id: 'vhf-low',  name: 'VHF Low (72–76 MHz)',        startMHz: 72,    endMHz: 76,    color: '#166534' },
-  // §3.12 Other Services — FM/Mass Cast
-  { id: 'fm-other', name: 'FM / Mass Cast',               startMHz: 87.5,  endMHz: 108,   color: '#94a3b8' },
-  // §3.1 PLMR Table 1 — VHF High (137–174 MHz, excl. maritime 150–150.8)
-  { id: 'vhf-hi',   name: 'VHF High (137–174 MHz)',      startMHz: 137,   endMHz: 174,   color: '#15803d' },
-  // §3.5/3.6 Mics & IEM Table 6/7 — VHF band (174–216 MHz)
-  { id: 'vhf-mics', name: 'VHF Mics / IEM (174–216 MHz)', startMHz: 174,  endMHz: 216,   color: '#1d4ed8' },
-  // §3.11 Photographers / §3.2 Telemetry Table 3 — 340–360 MHz
-  { id: 'photo',    name: 'Photo Triggers (340–360 MHz)', startMHz: 340,   endMHz: 360,   color: '#475569' },
-  // §3.2 Telemetry Table 3 — RF camera control (403–420 MHz)
-  { id: 'telem',    name: 'Telemetry (403–420 MHz)',      startMHz: 403,   endMHz: 420,   color: '#0891b2' },
-  // §3.1 PLMR Table 2 + §3.3 Intercom Table 4 — UHF production (420–470 MHz)
-  { id: 'uhf-prod', name: 'UHF Prod (420–470 MHz)',       startMHz: 420,   endMHz: 470,   color: '#166534' },
-  // §3.5/3.6 Mics & IEM Table 6/7 — primary UHF band (470–608 MHz)
-  { id: 'uhf-mics', name: 'UHF Mics / IEM (470–608 MHz)', startMHz: 470,  endMHz: 608,   color: '#2563eb' },
-  // §3.4 Wireless Video Camera Table 5 — L-Band (1425–1525 MHz; 1 MHz step)
-  { id: 'l-band-cam', name: 'WVC L-Band (1425–1525 MHz)', startMHz: 1425, endMHz: 1525,  color: '#b45309', snapMHz: 1.0 },
-  // §3.7 Earth Stations Table 8 — L-Band Space→Earth (1525–1559 MHz)
-  { id: 'sat-l',    name: 'Satellite L-Band (1525–1559)', startMHz: 1525,  endMHz: 1559,  color: '#a21caf', snapMHz: 1.0 },
-  // §3.3 Intercom Table 4 — DECT belt-packs (1920–1930 MHz)
-  { id: 'dect',     name: 'DECT (1920–1930 MHz)',          startMHz: 1920,  endMHz: 1930,  color: '#0f766e' },
-  // §3.10 WLAN Table 11 — 2.4 GHz (2400–2483.5 MHz; 20 MHz channels)
-  { id: 'wlan-24',  name: 'WLAN (2.4 GHz)',                startMHz: 2400,  endMHz: 2484,  color: '#4338ca', snapMHz: 20.0 },
-  // §3.10 WLAN Table 11 — 5 GHz (5150–5850 MHz; 20 MHz channels)
-  { id: 'wlan-5g',  name: 'WLAN (5 GHz)',                  startMHz: 5150,  endMHz: 5850,  color: '#4f46e5', snapMHz: 20.0 },
-  // §3.10 WLAN Table 11 — 6 GHz (5925–6425 MHz; 20 MHz channels)
-  { id: 'wlan-6g',  name: 'WLAN (6 GHz)',                  startMHz: 5925,  endMHz: 6425,  color: '#6366f1', snapMHz: 20.0 },
-  // §3.8 Microwave Mobile Links Table 9 — 6.425–6.875 GHz (7 MHz chan)
-  { id: 'mw-link',  name: 'Microwave Links (6.4–6.9 GHz)', startMHz: 6425,  endMHz: 6875,  color: '#e11d48', snapMHz: 7.0 },
-  // §3.9 Fixed PtP Table 10 + §3.8 Table 9 — 10.7–11.7 GHz (28 MHz chan)
-  { id: 'ptp-11g',  name: 'Fixed PtP (10.7–11.7 GHz)',     startMHz: 10700, endMHz: 11700, color: '#b91c1c', snapMHz: 28.0 },
+  // §3.1 PLMR Table 1 — VHF Low (6.25 kHz PLMR channels)
+  { id: 'vhf-low',  name: 'VHF Low (72–76 MHz)',          startMHz: 72,    endMHz: 76,    color: '#166534', channelMHz: 0.00625 },
+  // §3.12 Other Services — FM/Mass Cast (200 kHz FM channels)
+  { id: 'fm-other', name: 'FM / Mass Cast',                startMHz: 87.5,  endMHz: 108,   color: '#94a3b8', channelMHz: 0.2 },
+  // §3.1 PLMR Table 1 — VHF High (6.25 kHz PLMR channels)
+  { id: 'vhf-hi',   name: 'VHF High (137–174 MHz)',        startMHz: 137,   endMHz: 174,   color: '#15803d', channelMHz: 0.00625 },
+  // §3.5/3.6 Mics & IEM Table 6/7 — VHF band (200 kHz mic channels)
+  { id: 'vhf-mics', name: 'VHF Mics / IEM (174–216 MHz)', startMHz: 174,   endMHz: 216,   color: '#1d4ed8', channelMHz: 0.2, snapMHz: 0.2 },
+  // §3.11 Photographers / §3.2 Telemetry Table 3 — 100 kHz trigger channels
+  { id: 'photo',    name: 'Photo Triggers (340–360 MHz)',  startMHz: 340,   endMHz: 360,   color: '#475569', channelMHz: 0.1, snapMHz: 0.1 },
+  // §3.2 Telemetry Table 3 — RF camera control (6.25 kHz channels)
+  { id: 'telem',    name: 'Telemetry (403–420 MHz)',        startMHz: 403,   endMHz: 420,   color: '#0891b2', channelMHz: 0.00625 },
+  // §3.1 PLMR Table 2 + §3.3 Intercom Table 4 — UHF (6.25 kHz channels)
+  { id: 'uhf-prod', name: 'UHF Prod (420–470 MHz)',         startMHz: 420,   endMHz: 470,   color: '#166534', channelMHz: 0.00625 },
+  // §3.5/3.6 Mics & IEM Table 6/7 — primary UHF band (200 kHz channels)
+  { id: 'uhf-mics', name: 'UHF Mics / IEM (470–608 MHz)', startMHz: 470,   endMHz: 608,   color: '#2563eb', channelMHz: 0.2, snapMHz: 0.2 },
+  // §3.4 Wireless Video Camera Table 5 — L-Band (4 MHz channels)
+  { id: 'l-band-cam', name: 'WVC L-Band (1425–1525 MHz)', startMHz: 1425,  endMHz: 1525,  color: '#b45309', channelMHz: 4.0, snapMHz: 4.0 },
+  // §3.7 Earth Stations Table 8 — L-Band (3 MHz transponders)
+  { id: 'sat-l',    name: 'Satellite L-Band (1525–1559)', startMHz: 1525,  endMHz: 1559,  color: '#a21caf', channelMHz: 3.0, snapMHz: 3.0 },
+  // §3.3 Intercom Table 4 — DECT belt-packs (1.728 MHz DECT channels)
+  { id: 'dect',     name: 'DECT (1920–1930 MHz)',          startMHz: 1920,  endMHz: 1930,  color: '#0f766e', channelMHz: 1.728, snapMHz: 1.728 },
+  // §3.10 WLAN Table 11 — 2.4 GHz (20 MHz channels)
+  { id: 'wlan-24',  name: 'WLAN (2.4 GHz)',                startMHz: 2400,  endMHz: 2484,  color: '#4338ca', channelMHz: 20.0, snapMHz: 20.0 },
+  // §3.10 WLAN Table 11 — 5 GHz (20 MHz channels)
+  { id: 'wlan-5g',  name: 'WLAN (5 GHz)',                  startMHz: 5150,  endMHz: 5850,  color: '#4f46e5', channelMHz: 20.0, snapMHz: 20.0 },
+  // §3.10 WLAN Table 11 — 6 GHz (20 MHz channels)
+  { id: 'wlan-6g',  name: 'WLAN (6 GHz)',                  startMHz: 5925,  endMHz: 6425,  color: '#6366f1', channelMHz: 20.0, snapMHz: 20.0 },
+  // §3.8 Microwave Mobile Links Table 9 — 1.75 MHz channel plan
+  { id: 'mw-link',  name: 'Microwave Links (6.4–6.9 GHz)', startMHz: 6425, endMHz: 6875,  color: '#e11d48', channelMHz: 1.75, snapMHz: 1.75 },
+  // §3.9 Fixed PtP Table 10 — 1.75 MHz channel plan
+  { id: 'ptp-11g',  name: 'Fixed PtP (10.7–11.7 GHz)',     startMHz: 10700, endMHz: 11700, color: '#b91c1c', channelMHz: 1.75, snapMHz: 1.75 },
 ];
 
 // ─── Services — LA28 §3.1 – §3.12 ────────────────────────────────────────────

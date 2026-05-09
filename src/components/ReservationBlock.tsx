@@ -22,8 +22,8 @@ export function ReservationBlock({ reservation, band, stripWidth, onRemove }: Pr
         position: 'absolute',
         left: `${left}px`,
         width: `${width}px`,
-        top: '4px',
-        bottom: '4px',
+        top: '2px',
+        bottom: '2px',
         backgroundImage:
           'repeating-linear-gradient(45deg, #f59e0b28 0px, #f59e0b28 5px, #fef3c740 5px, #fef3c740 10px)',
         border: '1.5px solid #f59e0baa',
