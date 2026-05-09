@@ -4,6 +4,7 @@ export interface FrequencyBand {
   startMHz: number;
   endMHz: number;
   color: string;
+  snapMHz?: number;
 }
 
 export interface FrequencyRequest {

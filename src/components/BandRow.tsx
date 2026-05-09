@@ -5,26 +5,33 @@ import { AllocationBlock } from './AllocationBlock';
 import { ReservationBlock } from './ReservationBlock';
 
 const STRIP_HEIGHT = 88;
-const SNAP_MHZ = 0.006;
-const MAJOR_STEP = 1.0;
-const MINOR_STEP = 0.2;
+const DEFAULT_SNAP_MHZ = 0.006;
+
+function gridSteps(range: number) {
+  if (range >= 30) return { major: 5, minor: 1 };
+  if (range >= 10) return { major: 2, minor: 0.5 };
+  return { major: 1, minor: 0.2 };
+}
 
 function buildGridLines(start: number, end: number, width: number) {
-  const lines: Array<{ left: number; major: boolean }> = [];
   const range = end - start;
-  let f = Math.round(Math.ceil(start / MINOR_STEP) * MINOR_STEP * 1000) / 1000;
+  const { major: majorStep, minor: minorStep } = gridSteps(range);
+  const lines: Array<{ left: number; major: boolean }> = [];
+  let f = Math.round(Math.ceil(start / minorStep) * minorStep * 1000) / 1000;
   while (f < end - 1e-9) {
-    const major = Math.abs((f - start) % MAJOR_STEP) < 1e-6;
+    const major = Math.abs(((f - start) / majorStep) % 1) < 1e-4;
     lines.push({ left: ((f - start) / range) * width, major });
-    f = Math.round((f + MINOR_STEP) * 1000) / 1000;
+    f = Math.round((f + minorStep) * 1000) / 1000;
   }
   return lines;
 }
 
 function generateTicks(start: number, end: number): number[] {
+  const range = end - start;
+  const step = range >= 30 ? 5 : 1;
   const ticks: number[] = [];
-  let f = Math.ceil(start);
-  while (f <= end) { ticks.push(f++); }
+  let f = Math.ceil(start / step) * step;
+  while (f <= end) { ticks.push(f); f += step; }
   return ticks;
 }
 
@@ -73,12 +80,13 @@ export function BandRow({
 
   // Window-level handlers for right-click drag (so selection works even when cursor leaves the strip)
   useEffect(() => {
+    const snap = band.snapMHz ?? DEFAULT_SNAP_MHZ;
     const snapFreq = (clientX: number) => {
       if (!stripElRef.current) return 0;
       const rect = stripElRef.current.getBoundingClientRect();
       const relX = Math.max(0, Math.min(clientX - rect.left, rect.width));
       const raw = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
-      return Math.max(band.startMHz, Math.min(Math.round(raw / SNAP_MHZ) * SNAP_MHZ, band.endMHz));
+      return Math.max(band.startMHz, Math.min(Math.round(raw / snap) * snap, band.endMHz));
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -92,7 +100,7 @@ export function BandRow({
       setReserveSelection(prev => {
         if (!prev) return null;
         const [s, end] = [Math.min(prev.startMHz, prev.endMHz), Math.max(prev.startMHz, prev.endMHz)];
-        if (end - s >= SNAP_MHZ * 4) onReserveRequest(band.id, s, end);
+        if (end - s >= snap * 4) onReserveRequest(band.id, s, end);
         return null;
       });
     };
@@ -109,10 +117,11 @@ export function BandRow({
     if (e.button !== 2) return;
     e.preventDefault();
     if (!stripElRef.current) return;
+    const snap = band.snapMHz ?? DEFAULT_SNAP_MHZ;
     const rect = stripElRef.current.getBoundingClientRect();
     const relX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const raw = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
-    const snapped = Math.max(band.startMHz, Math.min(Math.round(raw / SNAP_MHZ) * SNAP_MHZ, band.endMHz));
+    const snapped = Math.max(band.startMHz, Math.min(Math.round(raw / snap) * snap, band.endMHz));
     reserveStartRef.current = snapped;
     reservingRef.current = true;
     setReserveSelection({ startMHz: snapped, endMHz: snapped });

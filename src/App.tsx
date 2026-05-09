@@ -9,7 +9,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { initialBands, venues, allRequests, services } from './data';
 import type { Allocation, DragPreview, FrequencyRequest, PendingReserve, Reservation } from './types';
 
-const SNAP_MHZ = 0.006;
+const DEFAULT_SNAP_MHZ = 0.006;
 
 interface ConfirmState {
   title: string;
@@ -72,10 +72,11 @@ export default function App() {
     const rect = stripEl.getBoundingClientRect();
     const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width));
     const rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+    const snapMHz = band.snapMHz ?? DEFAULT_SNAP_MHZ;
     const maxStart = req.duplexOffsetMHz !== undefined
       ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
       : band.endMHz - req.bandwidthMHz;
-    const startMHz = Math.max(band.startMHz, Math.min(Math.round(rawFreq / SNAP_MHZ) * SNAP_MHZ, maxStart));
+    const startMHz = Math.max(band.startMHz, Math.min(Math.round(rawFreq / snapMHz) * snapMHz, maxStart));
     const endMHz = Math.round((startMHz + req.bandwidthMHz) * 1000) / 1000;
     return { band, startMHz, endMHz };
   }, []);
