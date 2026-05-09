@@ -2,10 +2,10 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { FrequencyRequest } from '../types';
 
-const PRIORITY_DOT: Record<string, string> = {
+const PRIORITY_COLOR: Record<string, string> = {
   high: '#ef4444',
   medium: '#f59e0b',
-  low: '#6b7280',
+  low: '#94a3b8',
 };
 
 interface Props {
@@ -29,32 +29,49 @@ export function RequestCard({ request, overlay }: Props) {
       style={{
         transform: CSS.Translate.toString(transform),
         opacity: isDragging && !overlay ? 0.4 : 1,
-        backgroundColor: '#1e293b',
-        border: `2px solid ${request.color}`,
+        backgroundColor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderLeft: `3px solid ${request.color}`,
         borderRadius: '6px',
         padding: '8px 10px',
-        marginBottom: '8px',
+        marginBottom: '6px',
         cursor: isDragging ? 'grabbing' : 'grab',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         userSelect: 'none',
-        boxShadow: overlay ? '0 4px 16px rgba(0,0,0,0.5)' : 'none',
+        boxShadow: overlay ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.04)',
       }}
       {...attributes}
       {...listeners}
     >
       <div style={{
-        width: '9px', height: '9px', borderRadius: '50%',
-        backgroundColor: PRIORITY_DOT[request.priority], flexShrink: 0,
+        width: '8px', height: '8px', borderRadius: '50%',
+        backgroundColor: PRIORITY_COLOR[request.priority], flexShrink: 0,
       }} />
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        <div style={{ fontWeight: '700', color: '#f1f5f9', fontSize: '13px' }}>{request.label}</div>
-        <div style={{ color: '#94a3b8', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontWeight: '700', color: '#1e293b', fontSize: '12px' }}>{request.label}</span>
+          {request.duplexOffsetMHz !== undefined && (
+            <span style={{
+              fontSize: '9px', fontWeight: '600', color: '#7c3aed',
+              backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe',
+              borderRadius: '3px', padding: '1px 4px', lineHeight: 1.4,
+            }}>
+              DUPLEX
+            </span>
+          )}
+        </div>
+        <div style={{ color: '#94a3b8', fontSize: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
           {request.device}
         </div>
       </div>
-      <div style={{ color: '#64748b', fontSize: '11px', flexShrink: 0 }}>{bwLabel}</div>
+      <div style={{ color: '#94a3b8', fontSize: '10px', flexShrink: 0, textAlign: 'right' }}>
+        <div>{bwLabel}</div>
+        {request.duplexOffsetMHz !== undefined && (
+          <div style={{ color: '#c4b5fd', fontSize: '9px' }}>+{request.duplexOffsetMHz * 1000}k offset</div>
+        )}
+      </div>
     </div>
   );
 }

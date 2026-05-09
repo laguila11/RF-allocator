@@ -7,6 +7,8 @@ import { RequestCard } from './components/RequestCard';
 import { initialBands, venues, allRequests } from './data';
 import type { Allocation, DragPreview, FrequencyRequest } from './types';
 
+const SNAP_MHZ = 0.006; // 6 kHz
+
 export default function App() {
   const [selectedVenueId, setSelectedVenueId] = useState(venues[0].id);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
@@ -37,10 +39,11 @@ export default function App() {
     const rect = stripEl.getBoundingClientRect();
     const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width));
     const rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
-    const startMHz = Math.max(
-      band.startMHz,
-      Math.min(Math.round(rawFreq / 0.025) * 0.025, band.endMHz - req.bandwidthMHz),
-    );
+    // Clamp so that dual secondary fits within the band
+    const maxStart = req.duplexOffsetMHz !== undefined
+      ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
+      : band.endMHz - req.bandwidthMHz;
+    const startMHz = Math.max(band.startMHz, Math.min(Math.round(rawFreq / SNAP_MHZ) * SNAP_MHZ, maxStart));
     const endMHz = Math.round((startMHz + req.bandwidthMHz) * 1000) / 1000;
     return { band, startMHz, endMHz };
   }, []);
@@ -61,8 +64,20 @@ export default function App() {
     if (!pos) { setDragPreview(null); return; }
     const { band, startMHz, endMHz } = pos;
     const existing = allocations.filter(a => a.bandId === band.id);
-    const valid = !existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
-    setDragPreview({ bandId: band.id, startMHz, endMHz, valid });
+    const primaryValid = !existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
+
+    if (activeRequest.duplexOffsetMHz !== undefined) {
+      const secStart = Math.round((startMHz + activeRequest.duplexOffsetMHz) * 1000) / 1000;
+      const secEnd = Math.round((secStart + activeRequest.bandwidthMHz) * 1000) / 1000;
+      const secInBounds = secEnd <= band.endMHz;
+      const secValid = secInBounds && !existing.some(a => !(secEnd <= a.startMHz || secStart >= a.endMHz));
+      setDragPreview({
+        bandId: band.id, startMHz, endMHz, valid: primaryValid && secValid,
+        secondary: { startMHz: secStart, endMHz: secEnd, valid: secValid },
+      });
+    } else {
+      setDragPreview({ bandId: band.id, startMHz, endMHz, valid: primaryValid });
+    }
   }, [activeRequest, allocations, calcDropPosition]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -83,27 +98,44 @@ export default function App() {
     const pos = calcDropPosition(over.id as string, req);
     if (!pos) return;
     const { band, startMHz, endMHz } = pos;
-
     const existing = allocations.filter(a => a.bandId === band.id);
-    const conflict = existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
-    if (conflict) {
-      setErrorMsg(`Conflict: ${req.label} overlaps an existing allocation`);
-      setTimeout(() => setErrorMsg(null), 3500);
-      return;
-    }
 
-    setAllocations(prev => [...prev, {
-      id: `alloc-${Date.now()}`,
-      requestId: req.id,
-      bandId: band.id,
-      startMHz,
-      endMHz,
-      venueId: venueOfReq.id,
-    }]);
+    if (req.duplexOffsetMHz !== undefined) {
+      const secStart = Math.round((startMHz + req.duplexOffsetMHz) * 1000) / 1000;
+      const secEnd = Math.round((secStart + req.bandwidthMHz) * 1000) / 1000;
+      const priConflict = existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
+      const secConflict = existing.some(a => !(secEnd <= a.startMHz || secStart >= a.endMHz));
+      if (priConflict || secConflict) {
+        setErrorMsg(`Conflict: ${req.label} duplex pair overlaps an existing allocation`);
+        setTimeout(() => setErrorMsg(null), 3500);
+        return;
+      }
+      const pairId = `pair-${Date.now()}`;
+      setAllocations(prev => [...prev,
+        { id: `${pairId}-a`, requestId: req.id, bandId: band.id, startMHz, endMHz, venueId: venueOfReq.id, pairId, pairRole: 'primary' },
+        { id: `${pairId}-b`, requestId: req.id, bandId: band.id, startMHz: secStart, endMHz: secEnd, venueId: venueOfReq.id, pairId, pairRole: 'secondary' },
+      ]);
+    } else {
+      const conflict = existing.some(a => !(endMHz <= a.startMHz || startMHz >= a.endMHz));
+      if (conflict) {
+        setErrorMsg(`Conflict: ${req.label} overlaps an existing allocation`);
+        setTimeout(() => setErrorMsg(null), 3500);
+        return;
+      }
+      setAllocations(prev => [...prev, {
+        id: `alloc-${Date.now()}`, requestId: req.id, bandId: band.id, startMHz, endMHz, venueId: venueOfReq.id,
+      }]);
+    }
   }, [allocations, calcDropPosition]);
 
   const handleDeallocate = useCallback((allocationId: string) => {
-    setAllocations(prev => prev.filter(a => a.id !== allocationId));
+    setAllocations(prev => {
+      const target = prev.find(a => a.id === allocationId);
+      if (!target) return prev;
+      // Remove both halves of a duplex pair together
+      if (target.pairId) return prev.filter(a => a.pairId !== target.pairId);
+      return prev.filter(a => a.id !== allocationId);
+    });
   }, []);
 
   return (
@@ -115,38 +147,36 @@ export default function App() {
     >
       <div style={{
         display: 'flex', flexDirection: 'column', height: '100vh',
-        backgroundColor: '#0a0f1e',
+        backgroundColor: '#f1f5f9',
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}>
         <header style={{
-          padding: '0 24px', height: '52px',
-          backgroundColor: '#0f172a', borderBottom: '1px solid #1e293b',
-          display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0,
+          padding: '0 24px', height: '52px', flexShrink: 0,
+          backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', gap: '14px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              backgroundColor: '#38bdf8', boxShadow: '0 0 8px #38bdf8aa',
-            }} />
-            <span style={{ color: '#f1f5f9', fontSize: '15px', fontWeight: '700', letterSpacing: '0.02em' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563eb' }} />
+            <span style={{ color: '#1e293b', fontSize: '15px', fontWeight: '700', letterSpacing: '0.01em' }}>
               RF Allocator
             </span>
           </div>
-          <span style={{ color: '#1e293b' }}>|</span>
-          <span style={{ color: '#475569', fontSize: '13px' }}>Live Event Spectrum Coordinator</span>
+          <span style={{ color: '#cbd5e1' }}>|</span>
+          <span style={{ color: '#94a3b8', fontSize: '13px' }}>Live Event Spectrum Coordinator</span>
 
           {errorMsg && (
             <div style={{
               marginLeft: 'auto',
-              backgroundColor: '#450a0a', border: '1px solid #991b1b',
-              color: '#fca5a5', padding: '5px 12px', borderRadius: '6px', fontSize: '12px',
+              backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+              color: '#dc2626', padding: '5px 12px', borderRadius: '6px', fontSize: '12px',
             }}>
               {errorMsg}
             </div>
           )}
         </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 256px', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 264px', flex: 1, overflow: 'hidden' }}>
           <SpectrumView
             bands={initialBands}
             allRequests={allRequests}

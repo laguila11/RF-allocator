@@ -13,9 +13,13 @@ interface Props {
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', padding: '10px 18px' }}>
-      <div style={{ color: '#475569', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ color: accent ? '#38bdf8' : '#e2e8f0', fontSize: '20px', fontWeight: '700', marginTop: '2px' }}>{value}</div>
+    <div style={{
+      backgroundColor: '#ffffff', border: '1px solid #e2e8f0',
+      borderRadius: '8px', padding: '10px 18px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    }}>
+      <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+      <div style={{ color: accent ? '#2563eb' : '#1e293b', fontSize: '20px', fontWeight: '700', marginTop: '2px' }}>{value}</div>
     </div>
   );
 }
@@ -26,8 +30,8 @@ export function SpectrumView({ bands, allRequests, allocations, venues, dragPrev
   const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
 
   return (
-    <div style={{ padding: '24px', overflowY: 'auto', backgroundColor: '#0a0f1e' }}>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', flexWrap: 'wrap' }}>
+    <div style={{ padding: '24px', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
         <Stat label="Total Spectrum" value={`${totalBW.toFixed(1)} MHz`} />
         <Stat label="Allocated" value={`${usedBW.toFixed(2)} MHz`} />
         <Stat label="Free" value={`${(totalBW - usedBW).toFixed(2)} MHz`} />
