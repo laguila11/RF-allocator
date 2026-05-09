@@ -5,8 +5,9 @@ import { SpectrumView } from './components/SpectrumView';
 import { RequestPanel } from './components/RequestPanel';
 import { ReserveDialog } from './components/ReserveDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { initialBands, venues, allRequests, services } from './data';
-import type { Allocation, BandGridParams, DragPreview, FrequencyRequest, PendingReserve, Reservation } from './types';
+import { loadData } from './dataLoader';
+import type { AppData } from './dataLoader';
+import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyRequest, PendingReserve, Reservation } from './types';
 
 const DEFAULT_SNAP_MHZ = 0.00625;
 
@@ -22,7 +23,8 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
 }
 
 export default function App() {
-  const [selectedVenueId, setSelectedVenueId] = useState(venues[0].id);
+  const [appData, setAppData] = useState<AppData | null>(null);
+  const [selectedVenueId, setSelectedVenueId] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('all');
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -33,6 +35,11 @@ export default function App() {
   const [lastReservationId, setLastReservationId] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
+  // Refs for stable callbacks — updated synchronously when appData loads
+  const bandsRef = useRef<FrequencyBand[]>([]);
+  const venuesRef = useRef<AppData['venues']>([]);
+  const allRequestsRef = useRef<FrequencyRequest[]>([]);
+
   const pointerXRef = useRef(0);
   const pointerYRef = useRef(0);
   const bandStripRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -40,6 +47,16 @@ export default function App() {
   const tooltipElRef = useRef<HTMLDivElement | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  useEffect(() => {
+    loadData().then(data => {
+      bandsRef.current = data.bands;
+      venuesRef.current = data.venues;
+      allRequestsRef.current = data.allRequests;
+      setAppData(data);
+      setSelectedVenueId(data.venues[0]?.id ?? '');
+    }).catch(err => console.error('Failed to load spectrum data:', err));
+  }, []);
 
   useEffect(() => {
     const track = (e: PointerEvent) => {
@@ -72,7 +89,7 @@ export default function App() {
   }, []);
 
   const calcDropPosition = useCallback((bandId: string, req: FrequencyRequest) => {
-    const band = initialBands.find(b => b.id === bandId);
+    const band = bandsRef.current.find(b => b.id === bandId);
     const stripEl = bandStripRefs.current.get(bandId);
     if (!band || !stripEl) return null;
     const rect = stripEl.getBoundingClientRect();
@@ -101,12 +118,12 @@ export default function App() {
     return { band, startMHz, endMHz };
   }, []);
 
-  const selectedVenue = venues.find(v => v.id === selectedVenueId)!;
+  const selectedVenue = appData?.venues.find(v => v.id === selectedVenueId) ?? appData?.venues[0];
   const allocatedIds = new Set(allocations.map(a => a.requestId));
-  const pendingRequests = selectedVenue.requests.filter(r => !allocatedIds.has(r.id));
+  const pendingRequests = selectedVenue?.requests.filter(r => !allocatedIds.has(r.id)) ?? [];
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const req = allRequests.find(r => r.id === event.active.id);
+    const req = allRequestsRef.current.find(r => r.id === event.active.id);
     setActiveRequest(req ?? null);
   }, []);
 
@@ -146,13 +163,13 @@ export default function App() {
     const { active, over } = event;
     if (!over) return;
 
-    const req = allRequests.find(r => r.id === active.id);
+    const req = allRequestsRef.current.find(r => r.id === active.id);
     if (!req) return;
 
     const currentAllocatedIds = new Set(allocations.map(a => a.requestId));
     if (currentAllocatedIds.has(req.id)) return;
 
-    const venueOfReq = venues.find(v => v.requests.some(r => r.id === req.id));
+    const venueOfReq = venuesRef.current.find(v => v.requests.some(r => r.id === req.id));
     if (!venueOfReq) return;
 
     const pos = calcDropPosition(over.id as string, req);
@@ -193,11 +210,11 @@ export default function App() {
   const handleDeallocate = useCallback((allocationId: string) => {
     const target = allocations.find(a => a.id === allocationId);
     if (!target) return;
-    const req = allRequests.find(r => r.id === target.requestId);
+    const req = allRequestsRef.current.find(r => r.id === target.requestId);
     const roleLabel = target.pairRole === 'primary' ? ' [TX]' : target.pairRole === 'secondary' ? ' [RX]' : '';
     const label = req ? `${req.label}${roleLabel}` : allocationId;
     const deviceLine = req ? `${req.device}\n` : '';
-    const detail = `${label}\n${deviceLine}${target.startMHz.toFixed(3)}–${target.endMHz.toFixed(3)} MHz`;
+    const detail = `${label}\n${deviceLine}${target.startMHz.toFixed(3)}-${target.endMHz.toFixed(3)} MHz`;
     const title = target.pairId ? 'Remove Duplex Pair' : 'Remove Allocation';
     setConfirmState({
       title,
@@ -221,7 +238,7 @@ export default function App() {
     const bwkHz = Math.round((res.endMHz - res.startMHz) * 1000);
     setConfirmState({
       title: 'Remove Reservation',
-      detail: `${res.reason}\n${res.startMHz.toFixed(3)}–${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
+      detail: `${res.reason}\n${res.startMHz.toFixed(3)}-${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
       confirmLabel: 'Remove',
       onConfirm: () => {
         setReservations(prev => prev.filter(r => r.id !== id));
@@ -250,7 +267,7 @@ export default function App() {
     const bwkHz = Math.round((res.endMHz - res.startMHz) * 1000);
     setConfirmState({
       title: 'Undo Reservation',
-      detail: `${res.reason}\n${res.startMHz.toFixed(3)}–${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
+      detail: `${res.reason}\n${res.startMHz.toFixed(3)}-${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
       confirmLabel: 'Undo',
       onConfirm: () => {
         setReservations(prev => prev.filter(r => r.id !== lastReservationId));
@@ -259,6 +276,21 @@ export default function App() {
       },
     });
   }, [lastReservationId, reservations]);
+
+  if (!appData || !selectedVenueId) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', backgroundColor: '#f1f5f9',
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        color: '#64748b', fontSize: '14px', gap: '10px',
+      }}>
+        <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #cbd5e1', borderTopColor: '#2563eb', animation: 'spin 0.7s linear infinite' }} />
+        Loading spectrum data…
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <DndContext
@@ -315,10 +347,11 @@ export default function App() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 264px', flex: 1, overflow: 'hidden' }}>
           <SpectrumView
-            bands={initialBands}
-            services={services}
+            bands={appData.bands}
+            services={appData.services}
             selectedServiceId={selectedServiceId}
-            allRequests={allRequests}
+            selectedVenueId={selectedVenueId}
+            allRequests={appData.allRequests}
             allocations={allocations}
             reservations={reservations}
             dragPreview={dragPreview}
@@ -330,8 +363,8 @@ export default function App() {
           />
           <RequestPanel
             requests={pendingRequests}
-            venues={venues}
-            services={services}
+            venues={appData.venues}
+            services={appData.services}
             selectedVenueId={selectedVenueId}
             selectedServiceId={selectedServiceId}
             onVenueChange={setSelectedVenueId}
@@ -340,7 +373,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Frequency tooltip — position managed via DOM ref, content via React state */}
+      {/* Frequency tooltip — position managed via DOM ref */}
       {dragPreview && (
         <div
           ref={tooltipElRef}

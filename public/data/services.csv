@@ -1,0 +1,13 @@
+id,name,color,bandIds
+svc-plmr,Private Land Mobile Radio (PLMR),#15803d,vhf-low;vhf-hi;uhf-prod
+svc-telem,Telemetry and Telecommand,#0891b2,photo;telem
+svc-intercom,Audio Intercommunication System,#059669,vhf-low;vhf-hi;uhf-prod;dect
+svc-cam,Wireless Video Camera,#d97706,l-band-cam
+svc-wmic,Wireless Microphones,#2563eb,vhf-mics;uhf-mics
+svc-iem,In-Ear Monitors (IEM),#7c3aed,vhf-mics;uhf-mics
+svc-earth,Permanent & Transportable Earth Stations,#a21caf,sat-l
+svc-mmlink,Microwave Mobile Links,#e11d48,mw-link;ptp-11g
+svc-ptp,Fixed Point to Point Link,#b91c1c,mw-link;ptp-11g
+svc-wlan,Wireless LAN (2.4 / 5 / 6 GHz),#4338ca,wlan-24;wlan-5g;wlan-6g
+svc-photo,Photographers Wireless Camera,#475569,photo
+svc-other,Other Services,#6b7280,fm-other

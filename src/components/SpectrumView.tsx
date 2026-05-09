@@ -5,6 +5,7 @@ interface Props {
   bands: FrequencyBand[];
   services: Service[];
   selectedServiceId: string;
+  selectedVenueId: string;
   allRequests: FrequencyRequest[];
   allocations: Allocation[];
   reservations: Reservation[];
@@ -30,20 +31,23 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 export function SpectrumView({
-  bands, services, selectedServiceId, allRequests, allocations, reservations,
+  bands, services, selectedServiceId, selectedVenueId, allRequests, allocations, reservations,
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onRegisterGrid, onReserveRequest,
 }: Props) {
-  const totalBW = bands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
-  const usedBW = allocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
-  const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
-
-  // Determine which bands to show
+  // Determine which bands to show based on service filter
   const visibleBands = selectedServiceId === 'all'
     ? bands
     : (() => {
         const svc = services.find(s => s.id === selectedServiceId);
         return svc ? bands.filter(b => svc.bandIds.includes(b.id)) : bands;
       })();
+
+  // Stats: total spectrum from visible bands; used from current venue's allocations in those bands
+  const visibleBandIds = new Set(visibleBands.map(b => b.id));
+  const totalBW = visibleBands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
+  const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId && visibleBandIds.has(a.bandId));
+  const usedBW = venueAllocations.reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
+  const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
 
   const activeService = selectedServiceId !== 'all'
     ? services.find(s => s.id === selectedServiceId) ?? null

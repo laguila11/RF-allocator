@@ -267,8 +267,10 @@ export function BandRow({
           }
 
           const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
+          const roleTag = alloc?.pairRole === 'primary' ? ' [TX]' : alloc?.pairRole === 'secondary' ? ' [RX]' : '';
+          const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
           const tip = req
-            ? `${req.label}${alloc!.pairRole === 'primary' ? ' [TX]' : alloc!.pairRole === 'secondary' ? ' [RX]' : ''}\n${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
+            ? `${req.label}${roleTag}\n${req.device}\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
             : res
             ? `Reserved: ${res.reason}\nClick to remove`
             : '';

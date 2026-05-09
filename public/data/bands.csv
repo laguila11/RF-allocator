@@ -1,0 +1,17 @@
+id,name,startMHz,endMHz,color,snapMHz,channelMHz
+vhf-low,VHF Low (72-76 MHz),72,76,#166534,,0.00625
+fm-other,FM / Mass Cast,87.5,108,#94a3b8,,0.2
+vhf-hi,VHF High (137-174 MHz),137,174,#15803d,,0.00625
+vhf-mics,VHF Mics / IEM (174-216 MHz),174,216,#1d4ed8,0.2,0.2
+photo,Photo Triggers (340-360 MHz),340,360,#475569,0.1,0.1
+telem,Telemetry (403-420 MHz),403,420,#0891b2,,0.00625
+uhf-prod,UHF Prod (420-470 MHz),420,470,#166534,,0.00625
+uhf-mics,UHF Mics / IEM (470-608 MHz),470,608,#2563eb,0.2,0.2
+l-band-cam,WVC L-Band (1425-1525 MHz),1425,1525,#b45309,4.0,4.0
+sat-l,Satellite L-Band (1525-1559 MHz),1525,1559,#a21caf,3.0,3.0
+dect,DECT (1920-1930 MHz),1920,1930,#0f766e,1.728,1.728
+wlan-24,WLAN (2.4 GHz),2400,2484,#4338ca,20.0,20.0
+wlan-5g,WLAN (5 GHz),5150,5850,#4f46e5,20.0,20.0
+wlan-6g,WLAN (6 GHz),5925,6425,#6366f1,20.0,20.0
+mw-link,Microwave Links (6.4-6.9 GHz),6425,6875,#e11d48,1.75,1.75
+ptp-11g,Fixed PtP (10.7-11.7 GHz),10700,11700,#b91c1c,1.75,1.75
