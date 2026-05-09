@@ -37,7 +37,6 @@ interface Props {
   allocations: Allocation[];
   reservations: Reservation[];
   allRequests: FrequencyRequest[];
-  selectedVenueId: string;
   dragPreview: DragPreview | null;
   onDeallocate: (id: string) => void;
   onRemoveReservation: (id: string) => void;
@@ -47,7 +46,7 @@ interface Props {
 }
 
 export function BandRow({
-  band, allocations, reservations, allRequests, selectedVenueId,
+  band, allocations, reservations, allRequests,
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onRegisterGrid, onReserveRequest,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: band.id });
@@ -253,36 +252,25 @@ export function BandRow({
           const isPrev = cellPreviewSet.has(idx);
           const isSel = cellSelectSet.has(idx);
 
-          // Own-venue allocation vs another venue's blocking allocation
-          const isOwnAlloc = alloc !== null && alloc.venueId === selectedVenueId;
-          const isOtherAlloc = alloc !== null && alloc.venueId !== selectedVenueId;
-
-          let bgColor: string;
-          let bgImage: string | undefined;
+          let bg: string;
           if (isSel) {
-            bgColor = 'rgba(245,158,11,0.5)';
+            bg = 'rgba(245,158,11,0.5)';
           } else if (isPrev) {
-            bgColor = preview!.valid ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.35)';
-          } else if (isOwnAlloc) {
-            const req = allRequests.find(r => r.id === alloc!.requestId);
-            bgColor = req?.color ?? '#94a3b8';
-          } else if (isOtherAlloc) {
-            // Striped pattern — occupied by another venue, cannot be modified
-            bgColor = '#e2e8f0';
-            bgImage = 'repeating-linear-gradient(45deg, transparent 0px, transparent 4px, rgba(100,116,139,0.25) 4px, rgba(100,116,139,0.25) 7px)';
+            bg = preview!.valid ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.35)';
+          } else if (alloc) {
+            const req = allRequests.find(r => r.id === alloc.requestId);
+            bg = req?.color ?? '#94a3b8';
           } else if (res) {
-            bgColor = 'rgba(245,158,11,0.25)';
+            bg = 'rgba(245,158,11,0.25)';
           } else {
-            bgColor = '#f8fafc';
+            bg = '#f8fafc';
           }
 
-          const req = isOwnAlloc ? allRequests.find(r => r.id === alloc!.requestId) : null;
+          const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
           const roleTag = alloc?.pairRole === 'primary' ? ' [TX]' : alloc?.pairRole === 'secondary' ? ' [RX]' : '';
           const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
           const tip = req
             ? `${req.label}${roleTag}\n${req.device}\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
-            : isOtherAlloc
-            ? `Blocked by another venue\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz`
             : res
             ? `Reserved: ${res.reason}\nClick to remove`
             : '';
@@ -293,11 +281,10 @@ export function BandRow({
               title={tip}
               style={{
                 height: `${cellHeightPx}px`,
-                backgroundColor: bgColor,
-                backgroundImage: bgImage,
-                opacity: isOwnAlloc && alloc?.pairRole === 'secondary' ? 0.7 : 1,
-                cursor: (isOwnAlloc || res) ? 'pointer' : isOtherAlloc ? 'not-allowed' : 'crosshair',
-                display: showLabel && (isOwnAlloc || res) ? 'flex' : 'block',
+                backgroundColor: bg,
+                opacity: alloc?.pairRole === 'secondary' ? 0.7 : 1,
+                cursor: alloc || res ? 'pointer' : 'crosshair',
+                display: showLabel && (alloc || res) ? 'flex' : 'block',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
@@ -307,7 +294,7 @@ export function BandRow({
                 lineHeight: 1,
               }}
               onClick={() => {
-                if (isOwnAlloc) onDeallocate(alloc!.id);
+                if (alloc) onDeallocate(alloc.id);
                 else if (res) onRemoveReservation(res.id);
               }}
             >

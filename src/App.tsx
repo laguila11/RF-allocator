@@ -40,6 +40,7 @@ export default function App() {
   const venuesRef = useRef<AppData['venues']>([]);
   const allRequestsRef = useRef<FrequencyRequest[]>([]);
   const compositeRequestsRef = useRef<CompositeRequest[]>([]);
+  const selectedVenueIdRef = useRef(selectedVenueId);
 
   const pointerXRef = useRef(0);
   const pointerYRef = useRef(0);
@@ -120,6 +121,8 @@ export default function App() {
     return { band, startMHz, endMHz };
   }, []);
 
+  selectedVenueIdRef.current = selectedVenueId;
+
   const selectedVenue = appData?.venues.find(v => v.id === selectedVenueId) ?? appData?.venues[0];
   const allocatedIds = new Set(allocations.map(a => a.requestId));
 
@@ -143,7 +146,8 @@ export default function App() {
     if (!pos) { setDragPreview(null); return; }
     const { band, startMHz, endMHz } = pos;
 
-    const existingAllocs = allocations.filter(a => a.bandId === band.id);
+    // Each venue has its own independent plan — only check this venue's allocations
+    const existingAllocs = allocations.filter(a => a.bandId === band.id && a.venueId === selectedVenueIdRef.current);
     const existingReservs = reservations.filter(r => r.bandId === band.id);
 
     const isBlocked = (s: number, e: number) =>
@@ -185,7 +189,8 @@ export default function App() {
     if (!pos) return;
     const { band, startMHz, endMHz } = pos;
 
-    const existingAllocs = allocations.filter(a => a.bandId === band.id);
+    // Venue plans are independent — only check this venue's own allocations for conflicts
+    const existingAllocs = allocations.filter(a => a.bandId === band.id && a.venueId === venueOfReq.id);
     const existingReservs = reservations.filter(r => r.bandId === band.id);
     const isBlocked = (s: number, e: number) =>
       existingAllocs.some(a => overlaps(s, e, a.startMHz, a.endMHz)) ||

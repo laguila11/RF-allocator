@@ -53,14 +53,16 @@ export function SpectrumView({
     ? services.find(s => s.id === selectedServiceId) ?? null
     : null;
 
+  // Each venue has its own independent spectrum plan — only show this venue's allocations
+  const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId);
+
   const bandRow = (band: FrequencyBand) => (
     <BandRow
       key={band.id}
       band={band}
-      allocations={allocations.filter(a => a.bandId === band.id)}
+      allocations={venueAllocations.filter(a => a.bandId === band.id)}
       reservations={reservations.filter(r => r.bandId === band.id)}
       allRequests={allRequests}
-      selectedVenueId={selectedVenueId}
       dragPreview={dragPreview}
       onDeallocate={onDeallocate}
       onRemoveReservation={onRemoveReservation}
