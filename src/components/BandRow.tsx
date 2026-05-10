@@ -6,6 +6,11 @@ const CELL_MIN_PX = 12;
 const CELL_MAX_HEIGHT = 48;
 const CELL_GAP = 1;
 
+function abbrev(label: string): string {
+  const words = label.trim().split(/\s+/);
+  return words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+}
+
 function fmtMHz(mhz: number): string {
   if (mhz >= 3000) {
     const g = mhz / 1000;
@@ -236,7 +241,7 @@ export function BandRow({
     return m;
   }, [allocations]);
 
-  const showLabel = cellWidthPx >= 28 && cellHeightPx >= 18;
+  const labelFontSize = Math.max(7, Math.min(10, cellHeightPx * 0.58));
 
   return (
     <div style={{ marginBottom: '18px' }}>
@@ -294,11 +299,20 @@ export function BandRow({
           const dimFilter = alloc && !isSel && !isPrev && allocIdx % 2 === 1
             ? 'brightness(0.78)' : undefined;
 
+          // White inset borders at the left edge of each allocation's first cell
+          // and right edge of its last cell — visible at any cell size.
+          const isFirst = !!alloc && (idx === 0 || cellAllocMap[idx - 1]?.id !== alloc.id);
+          const isLast  = !!alloc && (idx === numCells - 1 || cellAllocMap[idx + 1]?.id !== alloc.id);
+          const shadows = [
+            isFirst ? 'inset 2px 0 0 rgba(255,255,255,0.7)' : '',
+            isLast  ? 'inset -2px 0 0 rgba(255,255,255,0.7)' : '',
+          ].filter(Boolean).join(', ') || undefined;
+
           const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
-          const roleTag = alloc?.pairRole === 'primary' ? ' [TX]' : alloc?.pairRole === 'secondary' ? ' [RX]' : '';
+          const roleTag = alloc?.pairRole === 'primary' ? ' TX' : alloc?.pairRole === 'secondary' ? ' RX' : '';
           const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
           const tip = req
-            ? `${req.label}${roleTag}\n${req.device}\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
+            ? `${req.label}${roleTag === ' TX' ? ' [TX]' : roleTag === ' RX' ? ' [RX]' : ''}\n${req.device}\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
             : res
             ? `Reserved: ${res.reason}\nClick to remove`
             : '';
@@ -312,12 +326,13 @@ export function BandRow({
                 backgroundColor: bg,
                 opacity: alloc?.pairRole === 'secondary' ? 0.7 : 1,
                 filter: dimFilter,
+                boxShadow: shadows,
                 cursor: alloc || res ? 'pointer' : 'crosshair',
-                display: showLabel && (alloc || res) ? 'flex' : 'block',
+                display: alloc || res ? 'flex' : 'block',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
-                fontSize: '9px',
+                fontSize: `${labelFontSize}px`,
                 fontWeight: '700',
                 color: '#fff',
                 lineHeight: 1,
@@ -327,9 +342,14 @@ export function BandRow({
                 else if (res) onRemoveReservation(res.id);
               }}
             >
-              {showLabel && req && (
-                <span style={{ padding: '0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {req.label}{alloc?.pairRole === 'primary' ? ' TX' : alloc?.pairRole === 'secondary' ? ' RX' : ''}
+              {req && (
+                <span style={{ padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {cellWidthPx >= 28 ? req.label + roleTag : abbrev(req.label)}
+                </span>
+              )}
+              {res && !req && (
+                <span style={{ padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  R
                 </span>
               )}
             </div>
