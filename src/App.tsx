@@ -129,24 +129,29 @@ export default function App() {
     const relX = Math.max(0, Math.min(pointerXRef.current - rect.left, rect.width - 1));
     const relY = Math.max(0, Math.min(pointerYRef.current - rect.top, rect.height - 1));
 
-    let rawFreq: number;
+    const maxStart = req.duplexOffsetMHz !== undefined
+      ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
+      : band.endMHz - req.bandwidthMHz;
+
+    let startMHz: number;
     const gp = bandGridParams.current.get(bandId);
     if (gp && gp.numCols > 0) {
+      // Derive frequency from integer cell index — avoids floor(x/channelMHz)*channelMHz
+      // which produces floating-point errors on repeating-binary fractions like 1/160 (6.25 kHz).
       const cellW = rect.width / gp.numCols;
       const numRows = Math.ceil(gp.numCells / gp.numCols);
       const col = Math.min(Math.floor(relX / cellW), gp.numCols - 1);
       const row = Math.min(Math.floor(relY / (gp.cellHeightPx + 1)), numRows - 1);
       const cellIdx = Math.min(row * gp.numCols + col, gp.numCells - 1);
-      rawFreq = band.startMHz + cellIdx * gp.channelMHz;
+      startMHz = band.startMHz + cellIdx * gp.channelMHz;
     } else {
-      rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+      // Fallback (no grid params): snap continuous position to channelMHz grid.
+      const snapMHz = band.snapMHz ?? DEFAULT_SNAP_MHZ;
+      const rawFreq = band.startMHz + (relX / rect.width) * (band.endMHz - band.startMHz);
+      startMHz = Math.floor(rawFreq / snapMHz) * snapMHz;
     }
 
-    const snapMHz = band.snapMHz ?? DEFAULT_SNAP_MHZ;
-    const maxStart = req.duplexOffsetMHz !== undefined
-      ? band.endMHz - req.duplexOffsetMHz - req.bandwidthMHz
-      : band.endMHz - req.bandwidthMHz;
-    const startMHz = Math.max(band.startMHz, Math.min(Math.floor(rawFreq / snapMHz) * snapMHz, maxStart));
+    startMHz = Math.max(band.startMHz, Math.min(startMHz, maxStart));
     const endMHz = Math.round((startMHz + req.bandwidthMHz) * 1000) / 1000;
     return { band, startMHz, endMHz };
   }, []);
