@@ -228,6 +228,14 @@ export function BandRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reserveSelection, band.startMHz, displayChannelMHz, numCells]);
 
+  // Sort allocations by frequency and assign each an index so adjacent
+  // allocations always differ (even=full brightness, odd=78% brightness).
+  const allocOrder = useMemo(() => {
+    const m = new Map<string, number>();
+    [...allocations].sort((a, b) => a.startMHz - b.startMHz).forEach((a, i) => m.set(a.id, i));
+    return m;
+  }, [allocations]);
+
   const showLabel = cellWidthPx >= 28 && cellHeightPx >= 18;
 
   return (
@@ -282,6 +290,10 @@ export function BandRow({
             bg = '#f8fafc';
           }
 
+          const allocIdx = alloc ? (allocOrder.get(alloc.id) ?? 0) : 0;
+          const dimFilter = alloc && !isSel && !isPrev && allocIdx % 2 === 1
+            ? 'brightness(0.78)' : undefined;
+
           const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
           const roleTag = alloc?.pairRole === 'primary' ? ' [TX]' : alloc?.pairRole === 'secondary' ? ' [RX]' : '';
           const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
@@ -299,6 +311,7 @@ export function BandRow({
                 height: `${cellHeightPx}px`,
                 backgroundColor: bg,
                 opacity: alloc?.pairRole === 'secondary' ? 0.7 : 1,
+                filter: dimFilter,
                 cursor: alloc || res ? 'pointer' : 'crosshair',
                 display: showLabel && (alloc || res) ? 'flex' : 'block',
                 alignItems: 'center',
