@@ -342,7 +342,7 @@ export function BandRow({
                 else if (res) onRemoveReservation(res.id);
               }}
             >
-              {req && (
+              {req && isFirst && (
                 <span style={{ padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {cellWidthPx >= 28 ? req.label + roleTag : abbrev(req.label)}
                 </span>
