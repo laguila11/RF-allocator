@@ -5,10 +5,10 @@ import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyR
 const CELL_MIN_PX = 12;
 const CELL_MAX_HEIGHT = 48;
 const CELL_GAP = 1;
+const LABEL_COL_PX = 56;
 
 function abbrev(label: string): string {
-  const words = label.trim().split(/\s+/);
-  return words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+  return label.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 4);
 }
 
 function fmtMHz(mhz: number): string {
@@ -36,6 +36,15 @@ function fmtBW(bwMHz: number): string {
     : `${Math.round(bwMHz * 1000)} kHz`;
 }
 
+// Compact row-axis label: 3 decimal places max, no unit suffix (MHz context is clear from header).
+function fmtRowFreq(mhz: number): string {
+  if (mhz >= 3000) {
+    const g = mhz / 1000;
+    return `${parseFloat(g.toFixed(3))}G`;
+  }
+  return `${parseFloat(mhz.toFixed(3))}`;
+}
+
 interface Props {
   band: FrequencyBand;
   allocations: Allocation[];
@@ -55,8 +64,8 @@ export function BandRow({
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: band.id });
 
-  // Measure the strip's actual rendered pixel width so numCols adapts to the container.
   const [stripWidth, setStripWidth] = useState(800);
+  const [hoverFreq, setHoverFreq] = useState<number | null>(null);
   const roRef = useRef<ResizeObserver | null>(null);
   const stripElRef = useRef<HTMLElement | null>(null);
 
@@ -64,10 +73,7 @@ export function BandRow({
   const reserveStartRef = useRef(0);
   const [reserveSelection, setReserveSelection] = useState<{ startMHz: number; endMHz: number } | null>(null);
 
-  // ── Grid geometry ─────────────────────────────────────────────────────────
-  // numCells = rawCells always — one cell per channel slot, no aggregation.
-  // numCols  = min(rawCells, floor(stripWidth / CELL_MIN_PX)) — fills full width.
-  // numRows  = ceil(numCells / numCols) — as many rows as the channel count needs.
+  // ── Grid geometry ──────────────────────────────────────────────────────────
   const bandRange = band.endMHz - band.startMHz;
   const rawCells = Math.max(1, Math.round(bandRange / (band.channelMHz ?? 0.00625)));
   const rawCols  = Math.max(1, Math.floor(stripWidth / CELL_MIN_PX));
@@ -75,11 +81,12 @@ export function BandRow({
   const numCells = rawCells;
   const displayChannelMHz = bandRange / numCells;
 
-  const cellWidthPx  = stripWidth / numCols;          // fills width; always ≥ CELL_MIN_PX
+  const cellWidthPx  = stripWidth / numCols;
   const cellHeightPx = Math.min(cellWidthPx, CELL_MAX_HEIGHT);
   const numRows      = Math.ceil(numCells / numCols);
+  const showRowLabels = numRows > 1;
 
-  // Stable refs so event-handler closures never stale
+  // Stable refs for closures
   const numColsRef = useRef(numCols);
   const cellHeightPxRef = useRef(cellHeightPx);
   const numRowsRef = useRef(numRows);
@@ -93,9 +100,12 @@ export function BandRow({
   displayChannelMHzRef.current = displayChannelMHz;
   bandRef.current = band;
 
-  // Register element with dnd-kit, parent strip map, and ResizeObserver.
-  const setRef = useCallback((el: HTMLElement | null) => {
+  // dnd-kit droppable on outer container; ResizeObserver on inner cell grid.
+  const setDropRef = useCallback((el: HTMLElement | null) => {
     setNodeRef(el);
+  }, [setNodeRef]);
+
+  const setGridRef = useCallback((el: HTMLElement | null) => {
     onRegisterStrip(band.id, el);
     stripElRef.current = el;
     roRef.current?.disconnect();
@@ -106,17 +116,16 @@ export function BandRow({
       ro.observe(el);
       roRef.current = ro;
     }
-  }, [band.id, setNodeRef, onRegisterStrip]);
+  }, [band.id, onRegisterStrip]);
 
   useEffect(() => () => roRef.current?.disconnect(), []);
 
-  // Report grid geometry to parent for drag-position calculation.
   useEffect(() => {
     onRegisterGrid?.(band.id, { numCols, cellHeightPx, channelMHz: displayChannelMHz, numCells });
     return () => onRegisterGrid?.(band.id, null);
   }, [band.id, numCols, cellHeightPx, displayChannelMHz, numCells, onRegisterGrid]);
 
-  // ── Coordinate → cell index → frequency ──────────────────────────────────
+  // ── Coordinate → frequency ────────────────────────────────────────────────
   const snapCell = useCallback((clientX: number, clientY: number): number => {
     if (!stripElRef.current) return bandRef.current.startMHz;
     const rect = stripElRef.current.getBoundingClientRect();
@@ -131,6 +140,10 @@ export function BandRow({
     const idx = Math.min(row * numColsRef.current + col, numCellsRef.current - 1);
     return bandRef.current.startMHz + idx * displayChannelMHzRef.current;
   }, []);
+
+  const handleGridMouseMove = useCallback((e: React.MouseEvent) => {
+    setHoverFreq(snapCell(e.clientX, e.clientY));
+  }, [snapCell]);
 
   // ── Right-click drag → reservation ───────────────────────────────────────
   useEffect(() => {
@@ -179,9 +192,6 @@ export function BandRow({
   const preview = dragPreview?.bandId === band.id ? dragPreview : null;
 
   // ── Cell state maps ───────────────────────────────────────────────────────
-  // freq→cellIdx helper: Math.round tolerates float errors from repeating-binary
-  // channel sizes (0.00625, 0.2, 0.1, 1.728). Math.floor on start indices would
-  // give cellIdx-1 whenever cellIdx*ch/ch rounds just below the integer.
   const freqToIdx = (freqMHz: number) =>
     Math.round((freqMHz - band.startMHz) / displayChannelMHz);
 
@@ -233,8 +243,6 @@ export function BandRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reserveSelection, band.startMHz, displayChannelMHz, numCells]);
 
-  // Sort allocations by frequency and assign each an index so adjacent
-  // allocations always differ (even=full brightness, odd=78% brightness).
   const allocOrder = useMemo(() => {
     const m = new Map<string, number>();
     [...allocations].sort((a, b) => a.startMHz - b.startMHz).forEach((a, i) => m.set(a.id, i));
@@ -244,121 +252,172 @@ export function BandRow({
   const labelFontSize = Math.max(7, Math.min(10, cellHeightPx * 0.58));
 
   return (
-    <div style={{ marginBottom: '18px' }}>
+    <div style={{ marginBottom: '20px' }}>
+
       {/* Band header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px', paddingLeft: showRowLabels ? `${LABEL_COL_PX + 2}px` : '1px' }}>
         <div style={{ width: '3px', height: '14px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
         <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '12px' }}>{band.name}</span>
         <span style={{ color: '#94a3b8', fontSize: '11px' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
+        {hoverFreq !== null && (
+          <span style={{
+            color: '#1e293b', fontSize: '10px', fontWeight: '600',
+            backgroundColor: '#e2e8f0', padding: '1px 6px', borderRadius: '3px',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {fmtMHz(hoverFreq)}
+          </span>
+        )}
         <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '10px' }}>
           {allocations.length} assigned · {utilizationPct}% used
           {reservedBW > 0 && ` · ${fmtBW(reservedBW)} reserved`}
         </span>
       </div>
 
-      {/* 2-D cell grid — fills full container width; cells scale up from CELL_MIN_PX */}
+      {/* Outer drop zone: flex row of [label column] + [cell grid] */}
       <div
-        ref={setRef}
+        ref={setDropRef}
         onMouseDown={handleMouseDown}
         onContextMenu={e => e.preventDefault()}
         style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${numCols}, 1fr)`,
-          gap: `${CELL_GAP}px`,
-          backgroundColor: isOver ? `${band.color}44` : '#d1d5db',
+          display: 'flex',
           border: `1px solid ${isOver ? band.color : '#e2e8f0'}`,
-          borderRadius: '4px',
+          borderRadius: '5px',
           overflow: 'hidden',
           cursor: 'crosshair',
-          boxShadow: isOver ? `0 0 0 2px ${band.color}33` : 'none',
+          boxShadow: isOver ? `0 0 0 2px ${band.color}33` : '0 1px 3px rgba(0,0,0,0.07)',
           transition: 'box-shadow 0.1s, border-color 0.1s',
           userSelect: 'none',
+          backgroundColor: isOver ? `${band.color}44` : '#d1d5db',
         }}
       >
-        {Array.from({ length: numCells }, (_, idx) => {
-          const alloc = cellAllocMap[idx];
-          const res = cellResMap.get(idx);
-          const isPrev = cellPreviewSet.has(idx);
-          const isSel = cellSelectSet.has(idx);
+        {/* Row frequency label column */}
+        {showRowLabels && (
+          <div style={{
+            width: `${LABEL_COL_PX}px`,
+            flexShrink: 0,
+            backgroundColor: '#f8fafc',
+            borderRight: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {Array.from({ length: numRows }, (_, r) => (
+              <div
+                key={r}
+                style={{
+                  height: `${r < numRows - 1 ? cellHeightPx + CELL_GAP : cellHeightPx}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  padding: '0 5px 0 2px',
+                  fontSize: '8px',
+                  color: '#64748b',
+                  fontWeight: '500',
+                  fontVariantNumeric: 'tabular-nums',
+                  borderBottom: r < numRows - 1 ? '1px solid #e9ecef' : 'none',
+                  backgroundColor: r % 2 === 1 ? '#f1f5f9' : 'transparent',
+                }}
+              >
+                {fmtRowFreq(band.startMHz + r * numCols * displayChannelMHz)}
+              </div>
+            ))}
+          </div>
+        )}
 
-          let bg: string;
-          if (isSel) {
-            bg = 'rgba(245,158,11,0.5)';
-          } else if (isPrev) {
-            bg = preview!.valid ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.35)';
-          } else if (alloc) {
-            const req = allRequests.find(r => r.id === alloc.requestId);
-            bg = req?.color ?? '#94a3b8';
-          } else if (res) {
-            bg = 'rgba(245,158,11,0.25)';
-          } else {
-            bg = '#f8fafc';
-          }
+        {/* Cell grid */}
+        <div
+          ref={setGridRef}
+          onMouseMove={handleGridMouseMove}
+          onMouseLeave={() => setHoverFreq(null)}
+          style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${numCols}, 1fr)`,
+            gap: `${CELL_GAP}px`,
+            backgroundColor: isOver ? `${band.color}44` : '#d1d5db',
+          }}
+        >
+          {Array.from({ length: numCells }, (_, idx) => {
+            const alloc = cellAllocMap[idx];
+            const res = cellResMap.get(idx);
+            const isPrev = cellPreviewSet.has(idx);
+            const isSel = cellSelectSet.has(idx);
 
-          const allocIdx = alloc ? (allocOrder.get(alloc.id) ?? 0) : 0;
-          const dimFilter = alloc && !isSel && !isPrev && allocIdx % 2 === 1
-            ? 'brightness(0.78)' : undefined;
+            let bg: string;
+            if (isSel) {
+              bg = 'rgba(245,158,11,0.5)';
+            } else if (isPrev) {
+              bg = preview!.valid ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.35)';
+            } else if (alloc) {
+              const req = allRequests.find(r => r.id === alloc.requestId);
+              bg = req?.color ?? '#94a3b8';
+            } else if (res) {
+              bg = 'rgba(245,158,11,0.25)';
+            } else {
+              bg = '#f8fafc';
+            }
 
-          // White inset borders at the left edge of each allocation's first cell
-          // and right edge of its last cell — visible at any cell size.
-          const isFirst = !!alloc && (idx === 0 || cellAllocMap[idx - 1]?.id !== alloc.id);
-          const isLast  = !!alloc && (idx === numCells - 1 || cellAllocMap[idx + 1]?.id !== alloc.id);
-          const shadows = [
-            isFirst ? 'inset 2px 0 0 rgba(255,255,255,0.7)' : '',
-            isLast  ? 'inset -2px 0 0 rgba(255,255,255,0.7)' : '',
-          ].filter(Boolean).join(', ') || undefined;
+            const allocIdx = alloc ? (allocOrder.get(alloc.id) ?? 0) : 0;
+            const dimFilter = alloc && !isSel && !isPrev && allocIdx % 2 === 1
+              ? 'brightness(0.78)' : undefined;
 
-          const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
-          const roleTag = alloc?.pairRole === 'primary' ? ' TX' : alloc?.pairRole === 'secondary' ? ' RX' : '';
-          const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
-          const tip = req
-            ? `${req.label}${roleTag === ' TX' ? ' [TX]' : roleTag === ' RX' ? ' [RX]' : ''}\n${req.device}\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
-            : res
-            ? `Reserved: ${res.reason}\nClick to remove`
-            : '';
+            const isFirst = !!alloc && (idx === 0 || cellAllocMap[idx - 1]?.id !== alloc.id);
+            const isLast  = !!alloc && (idx === numCells - 1 || cellAllocMap[idx + 1]?.id !== alloc.id);
+            const shadows = [
+              isFirst ? 'inset 2px 0 0 rgba(255,255,255,0.7)' : '',
+              isLast  ? 'inset -2px 0 0 rgba(255,255,255,0.7)' : '',
+            ].filter(Boolean).join(', ') || undefined;
 
-          return (
-            <div
-              key={idx}
-              title={tip}
-              style={{
-                height: `${cellHeightPx}px`,
-                backgroundColor: bg,
-                opacity: alloc?.pairRole === 'secondary' ? 0.7 : 1,
-                filter: dimFilter,
-                boxShadow: shadows,
-                cursor: alloc || res ? 'pointer' : 'crosshair',
-                display: alloc || res ? 'flex' : 'block',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                fontSize: `${labelFontSize}px`,
-                fontWeight: '700',
-                color: '#fff',
-                lineHeight: 1,
-              }}
-              onClick={() => {
-                if (alloc) onDeallocate(alloc.id);
-                else if (res) onRemoveReservation(res.id);
-              }}
-            >
-              {req && isFirst && (
-                <span style={{ padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {cellWidthPx >= 28 ? req.label + roleTag : abbrev(req.label)}
-                </span>
-              )}
-              {res && !req && (
-                <span style={{ padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  R
-                </span>
-              )}
-            </div>
-          );
-        })}
+            const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
+            const roleTag = alloc?.pairRole === 'primary' ? ' TX' : alloc?.pairRole === 'secondary' ? ' RX' : '';
+            const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
+            const tip = req
+              ? `${req.label}${alloc?.pairRole === 'primary' ? ' [TX]' : alloc?.pairRole === 'secondary' ? ' [RX]' : ''}\n${req.device}\n${bwLabel} · ${alloc!.startMHz.toFixed(3)}–${alloc!.endMHz.toFixed(3)} MHz\nClick to remove`
+              : res
+              ? `Reserved: ${res.reason}\nClick to remove`
+              : `${fmtMHz(band.startMHz + idx * displayChannelMHz)}`;
+
+            return (
+              <div
+                key={idx}
+                title={tip}
+                style={{
+                  height: `${cellHeightPx}px`,
+                  backgroundColor: bg,
+                  opacity: alloc?.pairRole === 'secondary' ? 0.7 : 1,
+                  filter: dimFilter,
+                  boxShadow: shadows,
+                  cursor: alloc || res ? 'pointer' : 'crosshair',
+                  display: alloc || res ? 'flex' : 'block',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  fontSize: `${labelFontSize}px`,
+                  fontWeight: '700',
+                  color: '#fff',
+                  lineHeight: 1,
+                }}
+                onClick={() => {
+                  if (alloc) onDeallocate(alloc.id);
+                  else if (res) onRemoveReservation(res.id);
+                }}
+              >
+                {req && isFirst && (
+                  <span style={{ padding: '0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {cellWidthPx >= 28 ? req.label + roleTag : abbrev(req.label)}
+                  </span>
+                )}
+                {res && !req && isFirst && (
+                  <span style={{ padding: '0 2px' }}>R</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Frequency axis */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px', padding: '0 1px' }}>
+      {/* Bottom frequency axis (single-row bands or band start/end) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: showRowLabels ? `${LABEL_COL_PX + 2}px` : '1px', paddingRight: '1px' }}>
         <span style={{ color: '#94a3b8', fontSize: '9px' }}>{fmtMHz(band.startMHz)}</span>
         {numRows > 1 && (
           <span style={{ color: '#cbd5e1', fontSize: '9px', fontStyle: 'italic' }}>
