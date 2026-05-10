@@ -178,37 +178,46 @@ export function BandRow({
   const preview = dragPreview?.bandId === band.id ? dragPreview : null;
 
   // ── Cell state maps ───────────────────────────────────────────────────────
+  // freq→cellIdx helper: Math.round tolerates float errors from repeating-binary
+  // channel sizes (0.00625, 0.2, 0.1, 1.728). Math.floor on start indices would
+  // give cellIdx-1 whenever cellIdx*ch/ch rounds just below the integer.
+  const freqToIdx = (freqMHz: number) =>
+    Math.round((freqMHz - band.startMHz) / displayChannelMHz);
+
   const cellAllocMap = useMemo(() => {
     const map: Array<Allocation | null> = new Array(numCells).fill(null);
     for (const alloc of allocations) {
-      const s = Math.max(0, Math.floor((alloc.startMHz - band.startMHz) / displayChannelMHz));
+      const s = Math.max(0, freqToIdx(alloc.startMHz));
       const e = Math.min(numCells, Math.ceil((alloc.endMHz - band.startMHz) / displayChannelMHz));
       for (let i = s; i < e; i++) if (!map[i]) map[i] = alloc;
     }
     return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allocations, band.startMHz, displayChannelMHz, numCells]);
 
   const cellResMap = useMemo(() => {
     const map = new Map<number, Reservation>();
     for (const res of reservations) {
-      const s = Math.max(0, Math.floor((res.startMHz - band.startMHz) / displayChannelMHz));
+      const s = Math.max(0, freqToIdx(res.startMHz));
       const e = Math.min(numCells, Math.ceil((res.endMHz - band.startMHz) / displayChannelMHz));
       for (let i = s; i < e; i++) if (!map.has(i)) map.set(i, res);
     }
     return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reservations, band.startMHz, displayChannelMHz, numCells]);
 
   const cellPreviewSet = useMemo(() => {
     if (!preview) return new Set<number>();
     const set = new Set<number>();
     const mark = (s: number, e: number) => {
-      const si = Math.max(0, Math.floor((s - band.startMHz) / displayChannelMHz));
+      const si = Math.max(0, freqToIdx(s));
       const ei = Math.min(numCells, Math.ceil((e - band.startMHz) / displayChannelMHz));
       for (let i = si; i < ei; i++) set.add(i);
     };
     mark(preview.startMHz, preview.endMHz);
     if (preview.secondary) mark(preview.secondary.startMHz, preview.secondary.endMHz);
     return set;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preview, band.startMHz, displayChannelMHz, numCells]);
 
   const cellSelectSet = useMemo(() => {
@@ -216,10 +225,11 @@ export function BandRow({
     const set = new Set<number>();
     const s = Math.min(reserveSelection.startMHz, reserveSelection.endMHz);
     const e = Math.max(reserveSelection.startMHz, reserveSelection.endMHz);
-    const si = Math.max(0, Math.floor((s - band.startMHz) / displayChannelMHz));
+    const si = Math.max(0, freqToIdx(s));
     const ei = Math.min(numCells, Math.ceil((e - band.startMHz) / displayChannelMHz));
     for (let i = si; i < ei; i++) set.add(i);
     return set;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reserveSelection, band.startMHz, displayChannelMHz, numCells]);
 
   const showLabel = cellWidthPx >= 28 && cellHeightPx >= 18;
