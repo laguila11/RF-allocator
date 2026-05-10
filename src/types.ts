@@ -64,7 +64,7 @@ export interface Reservation {
 export interface BandGridParams {
   numCols: number;
   cellHeightPx: number;
-  channelMHz: number; // display cell width in MHz (may be > band.channelMHz when cells are capped)
+  channelMHz: number; // display cell width in MHz (= band.channelMHz; one cell per channel slot)
   numCells: number;
 }
 

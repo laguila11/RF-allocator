@@ -249,6 +249,12 @@ export function BandRow({
     return m;
   }, [allocations]);
 
+  // O(1) request lookup — avoids an O(n) find() inside the per-cell render loop.
+  const reqById = useMemo(
+    () => new Map(allRequests.map(r => [r.id, r])),
+    [allRequests],
+  );
+
   const labelFontSize = Math.max(7, Math.min(10, cellHeightPx * 0.58));
 
   return (
@@ -277,7 +283,6 @@ export function BandRow({
       {/* Outer drop zone: flex row of [label column] + [cell grid] */}
       <div
         ref={setDropRef}
-        onMouseDown={handleMouseDown}
         onContextMenu={e => e.preventDefault()}
         style={{
           display: 'flex',
@@ -324,9 +329,10 @@ export function BandRow({
           </div>
         )}
 
-        {/* Cell grid */}
+        {/* Cell grid — handleMouseDown here so right-click on the label column is ignored */}
         <div
           ref={setGridRef}
+          onMouseDown={handleMouseDown}
           onMouseMove={handleGridMouseMove}
           onMouseLeave={() => setHoverFreq(null)}
           style={{
@@ -343,13 +349,15 @@ export function BandRow({
             const isPrev = cellPreviewSet.has(idx);
             const isSel = cellSelectSet.has(idx);
 
+            // Single O(1) lookup replaces two separate O(n) find() calls.
+            const req = alloc ? (reqById.get(alloc.requestId) ?? null) : null;
+
             let bg: string;
             if (isSel) {
               bg = 'rgba(245,158,11,0.5)';
             } else if (isPrev) {
               bg = preview!.valid ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.35)';
             } else if (alloc) {
-              const req = allRequests.find(r => r.id === alloc.requestId);
               bg = req?.color ?? '#94a3b8';
             } else if (res) {
               bg = 'rgba(245,158,11,0.25)';
@@ -361,14 +369,16 @@ export function BandRow({
             const dimFilter = alloc && !isSel && !isPrev && allocIdx % 2 === 1
               ? 'brightness(0.78)' : undefined;
 
-            const isFirst = !!alloc && (idx === 0 || cellAllocMap[idx - 1]?.id !== alloc.id);
-            const isLast  = !!alloc && (idx === numCells - 1 || cellAllocMap[idx + 1]?.id !== alloc.id);
+            const isFirst    = !!alloc && (idx === 0 || cellAllocMap[idx - 1]?.id !== alloc.id);
+            const isLast     = !!alloc && (idx === numCells - 1 || cellAllocMap[idx + 1]?.id !== alloc.id);
+            // isFirst was always false for reservation-only cells because it required alloc.
+            const isResFirst = !!res && !alloc && (idx === 0 || cellResMap.get(idx - 1)?.id !== res.id);
+            const isResLast  = !!res && !alloc && (idx === numCells - 1 || cellResMap.get(idx + 1)?.id !== res.id);
             const shadows = [
-              isFirst ? 'inset 2px 0 0 rgba(255,255,255,0.7)' : '',
-              isLast  ? 'inset -2px 0 0 rgba(255,255,255,0.7)' : '',
+              (isFirst || isResFirst) ? 'inset 2px 0 0 rgba(255,255,255,0.7)' : '',
+              (isLast  || isResLast)  ? 'inset -2px 0 0 rgba(255,255,255,0.7)' : '',
             ].filter(Boolean).join(', ') || undefined;
 
-            const req = alloc ? allRequests.find(r => r.id === alloc.requestId) : null;
             const roleTag = alloc?.pairRole === 'primary' ? ' TX' : alloc?.pairRole === 'secondary' ? ' RX' : '';
             const bwLabel = alloc ? fmtBW(alloc.endMHz - alloc.startMHz) : '';
             const tip = req
@@ -407,7 +417,7 @@ export function BandRow({
                     {cellWidthPx >= 28 ? req.label + roleTag : abbrev(req.label)}
                   </span>
                 )}
-                {res && !req && isFirst && (
+                {res && !req && isResFirst && (
                   <span style={{ padding: '0 2px' }}>R</span>
                 )}
               </div>
