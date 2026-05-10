@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyRequest, Reservation } from '../types';
 
-const CELL_MIN_PX = 12;
+const CELL_MIN_PX = 12;   // minimum cell width — pixel floor
 const CELL_MAX_HEIGHT = 48;
 const CELL_GAP = 1;
-const MAX_CELLS = 512;
-const MAX_ROWS = 12; // cap rows so narrow proportional strips don't become huge
+const MAX_CELLS = 512;    // display-resolution cap for very fine-grained bands
 
 function fmtMHz(mhz: number): string {
   if (mhz >= 3000) {
@@ -35,7 +34,6 @@ function fmtBW(bwMHz: number): string {
 
 interface Props {
   band: FrequencyBand;
-  stripWidth: number; // proportional width supplied by SpectrumView
   allocations: Allocation[];
   reservations: Reservation[];
   allRequests: FrequencyRequest[];
@@ -48,10 +46,14 @@ interface Props {
 }
 
 export function BandRow({
-  band, stripWidth, allocations, reservations, allRequests,
+  band, allocations, reservations, allRequests,
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onRegisterGrid, onReserveRequest,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: band.id });
+
+  // Measure the strip's actual rendered pixel width so numCols adapts to the container.
+  const [stripWidth, setStripWidth] = useState(800);
+  const roRef = useRef<ResizeObserver | null>(null);
   const stripElRef = useRef<HTMLElement | null>(null);
 
   const reservingRef = useRef(false);
@@ -59,24 +61,20 @@ export function BandRow({
   const [reserveSelection, setReserveSelection] = useState<{ startMHz: number; endMHz: number } | null>(null);
 
   // ── Grid geometry ─────────────────────────────────────────────────────────
+  // numCells = one cell per channel (channelMHz), capped for display performance.
+  // numCols = pack as many columns as fit at minimum cell size → fewest rows → shortest page.
+  // cellWidthPx = stripWidth / numCols  (≥ CELL_MIN_PX, scales up to fill full width).
   const bandRange = band.endMHz - band.startMHz;
-
-  // How many columns fit in this strip at minimum cell size
-  const numCols = Math.min(
-    Math.max(1, Math.floor(stripWidth / CELL_MIN_PX)),
-    Math.max(1, Math.round(bandRange / (band.channelMHz ?? 0.00625))),
-  );
-
-  // Cap total cells so height stays within MAX_ROWS rows
   const rawCells = Math.max(1, Math.round(bandRange / (band.channelMHz ?? 0.00625)));
-  const numCells = Math.min(rawCells, MAX_CELLS, numCols * MAX_ROWS);
+  const numCells = Math.min(rawCells, MAX_CELLS);
   const displayChannelMHz = bandRange / numCells;
 
-  const cellWidthPx = stripWidth / numCols;
+  const numCols = Math.min(numCells, Math.max(1, Math.floor(stripWidth / CELL_MIN_PX)));
+  const cellWidthPx = stripWidth / numCols;           // fills width; always ≥ CELL_MIN_PX
   const cellHeightPx = Math.min(cellWidthPx, CELL_MAX_HEIGHT);
   const numRows = Math.ceil(numCells / numCols);
 
-  // Stable refs for event-handler closures
+  // Stable refs so event-handler closures never stale
   const numColsRef = useRef(numCols);
   const cellHeightPxRef = useRef(cellHeightPx);
   const numRowsRef = useRef(numRows);
@@ -90,19 +88,30 @@ export function BandRow({
   displayChannelMHzRef.current = displayChannelMHz;
   bandRef.current = band;
 
+  // Register element with dnd-kit, parent strip map, and ResizeObserver.
   const setRef = useCallback((el: HTMLElement | null) => {
     setNodeRef(el);
     onRegisterStrip(band.id, el);
     stripElRef.current = el;
+    roRef.current?.disconnect();
+    roRef.current = null;
+    if (el) {
+      setStripWidth(el.getBoundingClientRect().width || 800);
+      const ro = new ResizeObserver(([entry]) => setStripWidth(entry.contentRect.width));
+      ro.observe(el);
+      roRef.current = ro;
+    }
   }, [band.id, setNodeRef, onRegisterStrip]);
 
-  // Report grid geometry to parent (used for 2-D drop-position calculation)
+  useEffect(() => () => roRef.current?.disconnect(), []);
+
+  // Report grid geometry to parent for drag-position calculation.
   useEffect(() => {
     onRegisterGrid?.(band.id, { numCols, cellHeightPx, channelMHz: displayChannelMHz, numCells });
     return () => onRegisterGrid?.(band.id, null);
   }, [band.id, numCols, cellHeightPx, displayChannelMHz, numCells, onRegisterGrid]);
 
-  // ── Coordinate → frequency ────────────────────────────────────────────────
+  // ── Coordinate → cell index → frequency ──────────────────────────────────
   const snapCell = useCallback((clientX: number, clientY: number): number => {
     if (!stripElRef.current) return bandRef.current.startMHz;
     const rect = stripElRef.current.getBoundingClientRect();
@@ -118,7 +127,7 @@ export function BandRow({
     return bandRef.current.startMHz + idx * displayChannelMHzRef.current;
   }, []);
 
-  // ── Right-click drag reservation ──────────────────────────────────────────
+  // ── Right-click drag → reservation ───────────────────────────────────────
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!reservingRef.current) return;
@@ -164,7 +173,7 @@ export function BandRow({
 
   const preview = dragPreview?.bandId === band.id ? dragPreview : null;
 
-  // ── Pre-compute cell state maps ───────────────────────────────────────────
+  // ── Cell state maps ───────────────────────────────────────────────────────
   const cellAllocMap = useMemo(() => {
     const map: Array<Allocation | null> = new Array(numCells).fill(null);
     for (const alloc of allocations) {
@@ -212,19 +221,19 @@ export function BandRow({
   const showLabel = cellWidthPx >= 28 && cellHeightPx >= 18;
 
   return (
-    <div style={{ marginBottom: '18px', width: `${stripWidth}px` }}>
+    <div style={{ marginBottom: '18px' }}>
       {/* Band header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
         <div style={{ width: '3px', height: '14px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
-        <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap' }}>{band.name}</span>
-        <span style={{ color: '#94a3b8', fontSize: '11px', whiteSpace: 'nowrap' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
-        <span style={{ color: '#94a3b8', fontSize: '10px', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-          {allocations.length > 0 && `${allocations.length} · `}{utilizationPct}%
-          {reservedBW > 0 && ` · ${fmtBW(reservedBW)} rsv`}
+        <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '12px' }}>{band.name}</span>
+        <span style={{ color: '#94a3b8', fontSize: '11px' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
+        <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '10px' }}>
+          {allocations.length} assigned · {utilizationPct}% used
+          {reservedBW > 0 && ` · ${fmtBW(reservedBW)} reserved`}
         </span>
       </div>
 
-      {/* 2-D cell grid */}
+      {/* 2-D cell grid — fills full container width; cells scale up from CELL_MIN_PX */}
       <div
         ref={setRef}
         onMouseDown={handleMouseDown}
