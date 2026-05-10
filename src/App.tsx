@@ -443,8 +443,8 @@ export default function App() {
             </svg>
           </button>
 
-          {/* Right: spectrum view — scrolls both ways */}
-          <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+          {/* Right: spectrum view — vertical scroll only, no horizontal overflow */}
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0 }}>
             <SpectrumView
               bands={appData.bands}
               services={appData.services}
