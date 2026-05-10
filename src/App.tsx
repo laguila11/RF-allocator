@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent, DragMoveEvent, DragStartEvent } from '@dnd-kit/core';
 import { SpectrumView } from './components/SpectrumView';
@@ -22,6 +22,37 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
   return !(aEnd <= bStart || aStart >= bEnd);
 }
 
+const selectStyle: React.CSSProperties = {
+  backgroundColor: '#ffffff',
+  border: '1px solid #e2e8f0',
+  borderRadius: '6px',
+  color: '#1e293b',
+  fontSize: '13px',
+  fontWeight: '600',
+  padding: '5px 28px 5px 10px',
+  cursor: 'pointer',
+  outline: 'none',
+  appearance: 'none',
+};
+
+function ChevronDown() {
+  return (
+    <svg style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+      width="10" height="6" viewBox="0 0 10 6" fill="none">
+      <path d="M1 1l4 4 4-4" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+      <span style={{ color: '#94a3b8', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+      <span style={{ color: accent ? '#2563eb' : '#1e293b', fontSize: '15px', fontWeight: '700', lineHeight: 1.1 }}>{value}</span>
+    </div>
+  );
+}
+
 export default function App() {
   const [appData, setAppData] = useState<AppData | null>(null);
   const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -32,10 +63,9 @@ export default function App() {
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pendingReserve, setPendingReserve] = useState<PendingReserve | null>(null);
-  const [lastReservationId, setLastReservationId] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
 
-  // Refs for stable callbacks — updated synchronously when appData loads
   const bandsRef = useRef<FrequencyBand[]>([]);
   const venuesRef = useRef<AppData['venues']>([]);
   const allRequestsRef = useRef<FrequencyRequest[]>([]);
@@ -126,13 +156,32 @@ export default function App() {
   const selectedVenue = appData?.venues.find(v => v.id === selectedVenueId) ?? appData?.venues[0];
   const allocatedIds = new Set(allocations.map(a => a.requestId));
 
-  // Composite groups for the selected venue
   const venueComposites = (appData?.compositeRequests ?? []).filter(c => c.venueId === selectedVenueId);
   const compositeRequestIds = new Set(venueComposites.flatMap(c => c.memberRequests.map(r => r.id)));
-  // A composite stays "pending" until every member is allocated
   const pendingCompositeGroups = venueComposites.filter(c => c.memberRequests.some(r => !allocatedIds.has(r.id)));
-  // Standalone pending requests — excludes composite members (those are shown inside their group card)
-  const pendingRequests = (selectedVenue?.requests ?? []).filter(r => !allocatedIds.has(r.id) && !compositeRequestIds.has(r.id));
+  const allPendingRequests = (selectedVenue?.requests ?? []).filter(r => !allocatedIds.has(r.id) && !compositeRequestIds.has(r.id));
+
+  // Apply service filter for the panel
+  const pendingRequests = selectedServiceId === 'all'
+    ? allPendingRequests
+    : allPendingRequests.filter(r => r.serviceId === selectedServiceId);
+  const pendingComposites = selectedServiceId === 'all' || selectedServiceId === 'svc-other'
+    ? pendingCompositeGroups
+    : [];
+
+  // Stats for toolbar
+  const visibleBands = useMemo(() => {
+    if (!appData) return [];
+    if (selectedServiceId === 'all') return appData.bands;
+    const svc = appData.services.find(s => s.id === selectedServiceId);
+    return svc ? appData.bands.filter(b => svc.bandIds.includes(b.id)) : appData.bands;
+  }, [appData, selectedServiceId]);
+
+  const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId);
+  const visibleBandIds = new Set(visibleBands.map(b => b.id));
+  const totalBW = visibleBands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
+  const usedBW = venueAllocations.filter(a => visibleBandIds.has(a.bandId)).reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
+  const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const req = allRequestsRef.current.find(r => r.id === event.active.id);
@@ -146,10 +195,8 @@ export default function App() {
     if (!pos) { setDragPreview(null); return; }
     const { band, startMHz, endMHz } = pos;
 
-    // Each venue has its own independent plan — only check this venue's allocations
     const existingAllocs = allocations.filter(a => a.bandId === band.id && a.venueId === selectedVenueIdRef.current);
     const existingReservs = reservations.filter(r => r.bandId === band.id);
-
     const isBlocked = (s: number, e: number) =>
       existingAllocs.some(a => overlaps(s, e, a.startMHz, a.endMHz)) ||
       existingReservs.some(r => overlaps(s, e, r.startMHz, r.endMHz));
@@ -189,7 +236,6 @@ export default function App() {
     if (!pos) return;
     const { band, startMHz, endMHz } = pos;
 
-    // Venue plans are independent — only check this venue's own allocations for conflicts
     const existingAllocs = allocations.filter(a => a.bandId === band.id && a.venueId === venueOfReq.id);
     const existingReservs = reservations.filter(r => r.bandId === band.id);
     const isBlocked = (s: number, e: number) =>
@@ -229,9 +275,8 @@ export default function App() {
     const label = req ? `${req.label}${roleLabel}` : allocationId;
     const deviceLine = req ? `${req.device}\n` : '';
     const detail = `${label}\n${deviceLine}${target.startMHz.toFixed(3)}-${target.endMHz.toFixed(3)} MHz`;
-    const title = target.pairId ? 'Remove Duplex Pair' : 'Remove Allocation';
     setConfirmState({
-      title,
+      title: target.pairId ? 'Remove Duplex Pair' : 'Remove Allocation',
       detail: target.pairId
         ? `${req?.label ?? ''} (TX + RX pair)\n${req?.device ?? ''}\nBoth channels will be removed`
         : detail,
@@ -256,7 +301,6 @@ export default function App() {
       confirmLabel: 'Remove',
       onConfirm: () => {
         setReservations(prev => prev.filter(r => r.id !== id));
-        setLastReservationId(prev => (prev === id ? null : prev));
         setConfirmState(null);
       },
     });
@@ -270,26 +314,8 @@ export default function App() {
     if (!pendingReserve) return;
     const id = `res-${Date.now()}`;
     setReservations(prev => [...prev, { id, ...pendingReserve, reason }]);
-    setLastReservationId(id);
     setPendingReserve(null);
   }, [pendingReserve]);
-
-  const handleUndoLastReservation = useCallback(() => {
-    if (!lastReservationId) return;
-    const res = reservations.find(r => r.id === lastReservationId);
-    if (!res) return;
-    const bwkHz = Math.round((res.endMHz - res.startMHz) * 1000);
-    setConfirmState({
-      title: 'Undo Reservation',
-      detail: `${res.reason}\n${res.startMHz.toFixed(3)}-${res.endMHz.toFixed(3)} MHz  (${bwkHz} kHz)`,
-      confirmLabel: 'Undo',
-      onConfirm: () => {
-        setReservations(prev => prev.filter(r => r.id !== lastReservationId));
-        setLastReservationId(null);
-        setConfirmState(null);
-      },
-    });
-  }, [lastReservationId, reservations]);
 
   if (!appData || !selectedVenueId) {
     return (
@@ -307,89 +333,138 @@ export default function App() {
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
-      onDragEnd={handleDragEnd}
-    >
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div style={{
         display: 'flex', flexDirection: 'column', height: '100vh',
         backgroundColor: '#f1f5f9',
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}>
+
+        {/* ── Header ────────────────────────────────────────────────────── */}
         <header style={{
-          padding: '0 24px', height: '52px', flexShrink: 0,
+          padding: '0 20px', height: '44px', flexShrink: 0,
           backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0',
-          display: 'flex', alignItems: 'center', gap: '14px',
+          display: 'flex', alignItems: 'center', gap: '12px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563eb' }} />
-            <span style={{ color: '#1e293b', fontSize: '15px', fontWeight: '700', letterSpacing: '0.01em' }}>
-              RF Allocator
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#2563eb' }} />
+            <span style={{ color: '#1e293b', fontSize: '14px', fontWeight: '700' }}>RF Allocator</span>
           </div>
           <span style={{ color: '#cbd5e1' }}>|</span>
-          <span style={{ color: '#94a3b8', fontSize: '13px' }}>Live Event Spectrum Coordinator</span>
-
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {lastReservationId && (
-              <button
-                onClick={handleUndoLastReservation}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  padding: '5px 12px', borderRadius: '6px',
-                  border: '1px solid #fde68a', backgroundColor: '#fef9c3',
-                  color: '#92400e', fontSize: '12px', fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                ↩ Undo reservation
-              </button>
-            )}
-            {errorMsg && (
-              <div style={{
-                backgroundColor: '#fef2f2', border: '1px solid #fecaca',
-                color: '#dc2626', padding: '5px 12px', borderRadius: '6px', fontSize: '12px',
-              }}>
-                {errorMsg}
-              </div>
-            )}
-          </div>
+          <span style={{ color: '#94a3b8', fontSize: '12px' }}>Live Event Spectrum Coordinator</span>
+          {errorMsg && (
+            <div style={{
+              marginLeft: 'auto',
+              backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+              color: '#dc2626', padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+            }}>
+              {errorMsg}
+            </div>
+          )}
         </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 264px', flex: 1, overflow: 'hidden' }}>
-          <SpectrumView
-            bands={appData.bands}
-            services={appData.services}
-            selectedServiceId={selectedServiceId}
-            selectedVenueId={selectedVenueId}
-            allRequests={appData.allRequests}
-            allocations={allocations}
-            reservations={reservations}
-            dragPreview={dragPreview}
-            onDeallocate={handleDeallocate}
-            onRemoveReservation={handleRemoveReservation}
-            onRegisterStrip={registerBandStrip}
-            onRegisterGrid={registerBandGrid}
-            onReserveRequest={handleReserveRequest}
-          />
-          <RequestPanel
-            requests={pendingRequests}
-            compositeGroups={pendingCompositeGroups}
-            allocatedIds={allocatedIds}
-            venues={appData.venues}
-            services={appData.services}
-            selectedVenueId={selectedVenueId}
-            selectedServiceId={selectedServiceId}
-            onVenueChange={setSelectedVenueId}
-            onServiceChange={setSelectedServiceId}
-          />
+        {/* ── Toolbar: venue / service / stats ──────────────────────────── */}
+        <div style={{
+          padding: '8px 20px', flexShrink: 0,
+          backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap',
+        }}>
+          {/* Venue selector */}
+          <div>
+            <div style={{ color: '#64748b', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>Venue</div>
+            <div style={{ position: 'relative' }}>
+              <select value={selectedVenueId} onChange={e => setSelectedVenueId(e.target.value)} style={selectStyle}>
+                {appData.venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+              <ChevronDown />
+            </div>
+          </div>
+
+          {/* Service selector */}
+          <div>
+            <div style={{ color: '#64748b', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>Service</div>
+            <div style={{ position: 'relative' }}>
+              <select value={selectedServiceId} onChange={e => setSelectedServiceId(e.target.value)} style={selectStyle}>
+                <option value="all">All Services</option>
+                {appData.services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <ChevronDown />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ width: '1px', height: '32px', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
+
+          {/* Stats */}
+          <Stat label="Total Spectrum" value={`${totalBW.toFixed(1)} MHz`} />
+          <Stat label="Allocated" value={`${usedBW.toFixed(2)} MHz`} />
+          <Stat label="Free" value={`${(totalBW - usedBW).toFixed(2)} MHz`} />
+          <Stat label="Utilization" value={`${utilizationPct}%`} accent />
+        </div>
+
+        {/* ── Body ──────────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+          {/* Left: collapsible request panel */}
+          <div style={{
+            width: panelOpen ? '260px' : '0',
+            flexShrink: 0, overflow: 'hidden',
+            transition: 'width 0.2s ease',
+          }}>
+            <div style={{ width: '260px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <RequestPanel
+                requests={pendingRequests}
+                compositeGroups={pendingComposites}
+                allocatedIds={allocatedIds}
+              />
+            </div>
+          </div>
+
+          {/* Collapse / expand toggle strip */}
+          <button
+            onClick={() => setPanelOpen(v => !v)}
+            title={panelOpen ? 'Collapse panel' : 'Expand panel'}
+            style={{
+              width: '16px', flexShrink: 0, padding: 0,
+              background: '#f8fafc', border: 'none',
+              borderLeft: '1px solid #e2e8f0',
+              borderRight: '1px solid #e2e8f0',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#94a3b8',
+            }}
+          >
+            <svg width="6" height="10" viewBox="0 0 6 10" fill="none">
+              <path
+                d={panelOpen ? 'M5 1L1 5l4 4' : 'M1 1l4 4-4 4'}
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+
+          {/* Right: spectrum view — scrolls both ways */}
+          <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+            <SpectrumView
+              bands={appData.bands}
+              services={appData.services}
+              selectedServiceId={selectedServiceId}
+              selectedVenueId={selectedVenueId}
+              allRequests={appData.allRequests}
+              allocations={allocations}
+              reservations={reservations}
+              dragPreview={dragPreview}
+              onDeallocate={handleDeallocate}
+              onRemoveReservation={handleRemoveReservation}
+              onRegisterStrip={registerBandStrip}
+              onRegisterGrid={registerBandGrid}
+              onReserveRequest={handleReserveRequest}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Frequency tooltip — position managed via DOM ref */}
+      {/* Drag tooltip */}
       {dragPreview && (
         <div
           ref={tooltipElRef}
@@ -397,23 +472,17 @@ export default function App() {
             position: 'fixed',
             left: `${pointerXRef.current + 14}px`,
             top: `${pointerYRef.current - 52}px`,
-            backgroundColor: '#1e293b',
-            color: '#f8fafc',
-            fontSize: '11px',
-            fontFamily: 'ui-monospace, Consolas, monospace',
-            padding: '6px 10px',
-            borderRadius: '6px',
-            pointerEvents: 'none',
-            zIndex: 9999,
+            backgroundColor: '#1e293b', color: '#f8fafc',
+            fontSize: '11px', fontFamily: 'ui-monospace, Consolas, monospace',
+            padding: '6px 10px', borderRadius: '6px',
+            pointerEvents: 'none', zIndex: 9999,
             boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
-            whiteSpace: 'nowrap',
-            lineHeight: 1.6,
+            whiteSpace: 'nowrap', lineHeight: 1.6,
             borderLeft: `3px solid ${dragPreview.valid ? '#22c55e' : '#ef4444'}`,
           }}
         >
           <div style={{
-            fontSize: '9px',
-            color: dragPreview.valid ? '#86efac' : '#fca5a5',
+            fontSize: '9px', color: dragPreview.valid ? '#86efac' : '#fca5a5',
             textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px',
           }}>
             {dragPreview.valid ? 'Place here' : 'Conflict'}

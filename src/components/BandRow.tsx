@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyRequest, Reservation } from '../types';
 
-const CELL_MIN_PX = 12;
-const CELL_MAX_HEIGHT = 48;
+const CELL_W = 12;   // fixed cell width px
+const CELL_H = 32;   // fixed cell height px
 const CELL_GAP = 1;
 const MAX_CELLS = 512;
 
@@ -50,35 +50,23 @@ export function BandRow({
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onRegisterGrid, onReserveRequest,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: band.id });
-  const [stripWidth, setStripWidth] = useState(800);
-  const roRef = useRef<ResizeObserver | null>(null);
   const stripElRef = useRef<HTMLElement | null>(null);
 
   const reservingRef = useRef(false);
   const reserveStartRef = useRef(0);
   const [reserveSelection, setReserveSelection] = useState<{ startMHz: number; endMHz: number } | null>(null);
 
-  // ── Grid geometry ─────────────────────────────────────────────────────────
+  // ── Grid geometry (fixed cell size, width proportional to band) ───────────
   const bandRange = band.endMHz - band.startMHz;
   const rawCells = Math.max(1, Math.round(bandRange / (band.channelMHz ?? 0.00625)));
   const numCells = Math.min(rawCells, MAX_CELLS);
   const displayChannelMHz = bandRange / numCells;
-
-  const numCols = Math.min(numCells, Math.max(1, Math.floor(stripWidth / CELL_MIN_PX)));
-  const cellWidthPx = stripWidth / numCols;
-  const cellHeightPx = Math.min(cellWidthPx, CELL_MAX_HEIGHT);
-  const numRows = Math.ceil(numCells / numCols);
+  const numCols = numCells; // single row — width reflects band size
 
   // Stable refs so closures don't stale
-  const numColsRef = useRef(numCols);
-  const cellHeightPxRef = useRef(cellHeightPx);
-  const numRowsRef = useRef(numRows);
   const numCellsRef = useRef(numCells);
   const displayChannelMHzRef = useRef(displayChannelMHz);
   const bandRef = useRef(band);
-  numColsRef.current = numCols;
-  cellHeightPxRef.current = cellHeightPx;
-  numRowsRef.current = numRows;
   numCellsRef.current = numCells;
   displayChannelMHzRef.current = displayChannelMHz;
   bandRef.current = band;
@@ -87,38 +75,21 @@ export function BandRow({
     setNodeRef(el);
     onRegisterStrip(band.id, el);
     stripElRef.current = el;
-    roRef.current?.disconnect();
-    roRef.current = null;
-    if (el) {
-      setStripWidth(el.getBoundingClientRect().width || 800);
-      const ro = new ResizeObserver(([entry]) => setStripWidth(entry.contentRect.width));
-      ro.observe(el);
-      roRef.current = ro;
-    }
   }, [band.id, setNodeRef, onRegisterStrip]);
 
-  useEffect(() => () => roRef.current?.disconnect(), []);
-
-  // Report grid geometry to parent (used for 2-D drop-position calculation)
+  // Report fixed grid geometry to parent (used for drag-position calculation)
   useEffect(() => {
-    onRegisterGrid?.(band.id, { numCols, cellHeightPx, channelMHz: displayChannelMHz, numCells });
+    onRegisterGrid?.(band.id, { numCols, cellHeightPx: CELL_H, channelMHz: displayChannelMHz, numCells });
     return () => onRegisterGrid?.(band.id, null);
-  }, [band.id, numCols, cellHeightPx, displayChannelMHz, numCells, onRegisterGrid]);
+  }, [band.id, numCols, displayChannelMHz, numCells, onRegisterGrid]);
 
-  // ── Coordinate → frequency ────────────────────────────────────────────────
-  const snapCell = useCallback((clientX: number, clientY: number): number => {
+  // ── Coordinate → frequency (single-row, fixed cell width) ────────────────
+  const snapCell = useCallback((clientX: number, _clientY: number): number => {
     if (!stripElRef.current) return bandRef.current.startMHz;
     const rect = stripElRef.current.getBoundingClientRect();
     const relX = Math.max(0, Math.min(clientX - rect.left, rect.width - 1));
-    const relY = Math.max(0, Math.min(clientY - rect.top, rect.height - 1));
-    const cellW = rect.width / numColsRef.current;
-    const col = Math.min(Math.floor(relX / cellW), numColsRef.current - 1);
-    const row = Math.min(
-      Math.floor(relY / (cellHeightPxRef.current + CELL_GAP)),
-      numRowsRef.current - 1,
-    );
-    const idx = Math.min(row * numColsRef.current + col, numCellsRef.current - 1);
-    return bandRef.current.startMHz + idx * displayChannelMHzRef.current;
+    const col = Math.min(Math.floor(relX / (CELL_W + CELL_GAP)), numCellsRef.current - 1);
+    return bandRef.current.startMHz + col * displayChannelMHzRef.current;
   }, []);
 
   // ── Right-click drag reservation ──────────────────────────────────────────
@@ -212,8 +183,6 @@ export function BandRow({
     return set;
   }, [reserveSelection, band.startMHz, displayChannelMHz, numCells]);
 
-  const showLabel = cellWidthPx >= 28 && cellHeightPx >= 18;
-
   return (
     <div style={{ marginBottom: '18px' }}>
       {/* Band header */}
@@ -221,20 +190,20 @@ export function BandRow({
         <div style={{ width: '3px', height: '14px', backgroundColor: band.color, borderRadius: '2px', flexShrink: 0 }} />
         <span style={{ color: '#1e293b', fontWeight: '700', fontSize: '12px' }}>{band.name}</span>
         <span style={{ color: '#94a3b8', fontSize: '11px' }}>{fmtBandRange(band.startMHz, band.endMHz)}</span>
-        <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '10px' }}>
+        <span style={{ color: '#94a3b8', fontSize: '10px' }}>
           {allocations.length} assigned · {utilizationPct}% used
           {reservedBW > 0 && ` · ${fmtBW(reservedBW)} reserved`}
         </span>
       </div>
 
-      {/* 2-D cell grid */}
+      {/* Fixed-width cell grid — width reflects actual band size */}
       <div
         ref={setRef}
         onMouseDown={handleMouseDown}
         onContextMenu={e => e.preventDefault()}
         style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${numCols}, 1fr)`,
+          gridTemplateColumns: `repeat(${numCols}, ${CELL_W}px)`,
           gap: `${CELL_GAP}px`,
           backgroundColor: isOver ? `${band.color}44` : '#d1d5db',
           border: `1px solid ${isOver ? band.color : '#e2e8f0'}`,
@@ -280,42 +249,24 @@ export function BandRow({
               key={idx}
               title={tip}
               style={{
-                height: `${cellHeightPx}px`,
+                height: `${CELL_H}px`,
                 backgroundColor: bg,
                 opacity: alloc?.pairRole === 'secondary' ? 0.7 : 1,
                 cursor: alloc || res ? 'pointer' : 'crosshair',
-                display: showLabel && (alloc || res) ? 'flex' : 'block',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                fontSize: '9px',
-                fontWeight: '700',
-                color: '#fff',
-                lineHeight: 1,
               }}
               onClick={() => {
                 if (alloc) onDeallocate(alloc.id);
                 else if (res) onRemoveReservation(res.id);
               }}
-            >
-              {showLabel && req && (
-                <span style={{ padding: '0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {req.label}{alloc?.pairRole === 'primary' ? ' TX' : alloc?.pairRole === 'secondary' ? ' RX' : ''}
-                </span>
-              )}
-            </div>
+            />
           );
         })}
       </div>
 
       {/* Frequency axis */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px', padding: '0 1px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px', padding: '0 1px', minWidth: `${numCells * (CELL_W + CELL_GAP)}px` }}>
         <span style={{ color: '#94a3b8', fontSize: '9px' }}>{fmtMHz(band.startMHz)}</span>
-        {numRows > 1 && (
-          <span style={{ color: '#cbd5e1', fontSize: '9px', fontStyle: 'italic' }}>
-            {numRows} rows · {fmtBW(displayChannelMHz)}/cell
-          </span>
-        )}
+        <span style={{ color: '#cbd5e1', fontSize: '9px', fontStyle: 'italic' }}>{fmtBW(displayChannelMHz)}/cell · {numCells} ch</span>
         <span style={{ color: '#94a3b8', fontSize: '9px' }}>{fmtMHz(band.endMHz)}</span>
       </div>
     </div>

@@ -3,58 +3,131 @@ oc-mic-01,MIC-01,Shure Axient Digital AXT200,0.2,svc-wmic,opening-ceremony,
 oc-mic-02,MIC-02,Shure Axient Digital AXT200,0.2,svc-wmic,opening-ceremony,
 oc-mic-03,MIC-03,Sennheiser Digital 6000,0.2,svc-wmic,opening-ceremony,
 oc-mic-04,MIC-04,Sennheiser Digital 6000,0.2,svc-wmic,opening-ceremony,
+oc-mic-05,MIC-05,Shure Axient Digital AXT200,0.2,svc-wmic,opening-ceremony,
+oc-mic-06,MIC-06,Sennheiser EW-DX (UHF),0.2,svc-wmic,opening-ceremony,
+oc-mic-07,MIC-07,Sennheiser EW-DX (UHF),0.2,svc-wmic,opening-ceremony,
+oc-mic-08,MIC-08,Sony UWP-D21,0.2,svc-wmic,opening-ceremony,
 oc-iem-01,IEM-01,Shure PSM1000,0.2,svc-iem,opening-ceremony,
 oc-iem-02,IEM-02,Shure PSM1000,0.2,svc-iem,opening-ceremony,
 oc-iem-03,IEM-03,Sennheiser SR 2050 IEM,0.2,svc-iem,opening-ceremony,
+oc-iem-04,IEM-04,Sennheiser SR 2050 IEM,0.2,svc-iem,opening-ceremony,
+oc-iem-05,IEM-05,Shure PSM900,0.2,svc-iem,opening-ceremony,
+oc-iem-06,IEM-06,Shure PSM900,0.2,svc-iem,opening-ceremony,
 oc-com-01,COM-01,Riedel Artist 32 (PLMR),0.2,svc-intercom,opening-ceremony,
 oc-com-02,COM-02,Clear-Com FreeSpeak Edge,0.2,svc-intercom,opening-ceremony,
+oc-com-03,COM-03,Clear-Com FreeSpeak Edge,0.2,svc-intercom,opening-ceremony,
+oc-com-04,COM-04,Riedel Bolero (belt pack),0.2,svc-intercom,opening-ceremony,
+oc-com-05,COM-05,Riedel Bolero (belt pack),0.2,svc-intercom,opening-ceremony,
 oc-pmr-01,PMR-01,Motorola MOTOTRBO SL300,0.2,svc-plmr,opening-ceremony,
 oc-pmr-02,PMR-02,Motorola MOTOTRBO SL300,0.2,svc-plmr,opening-ceremony,
+oc-pmr-03,PMR-03,Kenwood ProTalk TK-3501,0.2,svc-plmr,opening-ceremony,
+oc-pmr-04,PMR-04,Kenwood ProTalk TK-3501,0.2,svc-plmr,opening-ceremony,
+oc-pmr-05,PMR-05,Motorola DP4401e,0.2,svc-plmr,opening-ceremony,
+oc-pmr-06,PMR-06,Motorola DP4401e,0.2,svc-plmr,opening-ceremony,
 oc-cam-01,CAM-01,Vislink HCAM-S L-Band,8.0,svc-cam,opening-ceremony,
 oc-cam-02,CAM-02,Vislink HCAM-S L-Band,8.0,svc-cam,opening-ceremony,
+oc-cam-03,CAM-03,Grass Valley LDX 135 (Exlink),8.0,svc-cam,opening-ceremony,
+oc-tel-01,TEL-01,Omega Timing Transponder,0.025,svc-telem,opening-ceremony,
+oc-tel-02,TEL-02,RF Camera Control Head,0.025,svc-telem,opening-ceremony,
 oc-sat-01,SAT-01,Comtech SNG Uplink Terminal,3.0,svc-earth,opening-ceremony,
 oc-mwl-01,MWL-01,Ericsson MINI-LINK 6352 (OB van),28.0,svc-mmlink,opening-ceremony,
 oc-wlan-01,AP-01,Cisco Catalyst 9136 (5 GHz),80.0,svc-wlan,opening-ceremony,
+oc-wlan-02,AP-02,Cisco Catalyst 9136 (5 GHz),80.0,svc-wlan,opening-ceremony,
+oc-wlan-03,AP-03,Ruckus R750 (5 GHz),80.0,svc-wlan,opening-ceremony,
 oc-fm-01,FM-01,LP-100 Low Power FM Transmitter,0.2,svc-other,opening-ceremony,
 oc-fp-mic-01,MIC-FP1,Shure ULXD4 (UHF),0.2,svc-wmic,opening-ceremony,comp-oc-fp-01
 oc-fp-iem-01,IEM-FP1,Shure PSM300,0.2,svc-iem,opening-ceremony,comp-oc-fp-01
 oc-fp-pmr-01,PMR-FP1,Motorola DP4401e,0.2,svc-plmr,opening-ceremony,comp-oc-fp-01
+oc-sm-mic-01,MIC-SM1,Shure UR2 Handheld (SM),0.2,svc-wmic,opening-ceremony,comp-oc-sm-01
+oc-sm-iem-01,IEM-SM1,Shure PSM300 (SM),0.2,svc-iem,opening-ceremony,comp-oc-sm-01
+oc-sm-com-01,COM-SM1,Clear-Com RS-702A (belt pack),0.2,svc-intercom,opening-ceremony,comp-oc-sm-01
+oc-ms-mic-01,MIC-MS1,Sennheiser SKM 9000 (main),0.2,svc-wmic,opening-ceremony,comp-oc-ms-01
+oc-ms-mic-02,MIC-MS2,Sennheiser SKM 9000 (backup),0.2,svc-wmic,opening-ceremony,comp-oc-ms-01
+oc-ms-iem-01,IEM-MS1,Sennheiser EK 2000 IEM,0.2,svc-iem,opening-ceremony,comp-oc-ms-01
+oc-ms-cam-01,CAM-MS1,Vislink HCAM (Stage FX),8.0,svc-cam,opening-ceremony,comp-oc-ms-01
 ath-mic-01,MIC-01,Shure Axient Digital AXT200,0.2,svc-wmic,athletics,
 ath-mic-02,MIC-02,Sennheiser Digital 6000,0.2,svc-wmic,athletics,
 ath-mic-03,MIC-03,Sennheiser EW-DX (UHF),0.2,svc-wmic,athletics,
+ath-mic-04,MIC-04,Shure Axient Digital AXT200,0.2,svc-wmic,athletics,
+ath-mic-05,MIC-05,Sony UWP-D21,0.2,svc-wmic,athletics,
 ath-iem-01,IEM-01,Shure PSM1000,0.2,svc-iem,athletics,
 ath-iem-02,IEM-02,Sennheiser SR 2050 IEM,0.2,svc-iem,athletics,
+ath-iem-03,IEM-03,Shure PSM900,0.2,svc-iem,athletics,
+ath-iem-04,IEM-04,Sennheiser SR 2050 IEM,0.2,svc-iem,athletics,
 ath-com-01,COM-01,Riedel Artist 32 (PLMR),0.2,svc-intercom,athletics,
 ath-com-02,COM-02,Clear-Com FreeSpeak Edge,0.2,svc-intercom,athletics,
+ath-com-03,COM-03,Riedel Bolero (belt pack),0.2,svc-intercom,athletics,
+ath-com-04,COM-04,Riedel Bolero (belt pack),0.2,svc-intercom,athletics,
+ath-com-05,COM-05,Clear-Com RS-702A,0.2,svc-intercom,athletics,
 ath-pmr-01,PMR-01,Kenwood ProTalk TK-3501,0.2,svc-plmr,athletics,
 ath-pmr-02,PMR-02,Kenwood ProTalk TK-3501,0.2,svc-plmr,athletics,
+ath-pmr-03,PMR-03,Motorola DP4801e,0.2,svc-plmr,athletics,
+ath-pmr-04,PMR-04,Motorola DP4401e,0.2,svc-plmr,athletics,
+ath-pmr-05,PMR-05,Motorola MOTOTRBO SL300,0.2,svc-plmr,athletics,
 ath-tel-01,TEL-01,Omega Timing Transponder,0.025,svc-telem,athletics,
 ath-tel-02,TEL-02,RF Camera Control Head,0.025,svc-telem,athletics,
 ath-tel-03,TEL-03,RF Camera Control Head,0.025,svc-telem,athletics,
+ath-tel-04,TEL-04,Omega Timing Sensor,0.025,svc-telem,athletics,
+ath-tel-05,TEL-05,Omega Timing Sensor,0.025,svc-telem,athletics,
+ath-tel-06,TEL-06,RF Camera Control Head,0.025,svc-telem,athletics,
 ath-cam-01,CAM-01,Vislink HCAM-S L-Band,8.0,svc-cam,athletics,
 ath-cam-02,CAM-02,Vislink HCAM-S L-Band,8.0,svc-cam,athletics,
 ath-sat-01,SAT-01,Globecomm Transportable VSAT,3.0,svc-earth,athletics,
+ath-sat-02,SAT-02,Comtech SNG Uplink Terminal,3.0,svc-earth,athletics,
 ath-ptp-01,PTP-01,Ericsson MINI-LINK (Venue-IBC),28.0,svc-ptp,athletics,
 ath-wlan-01,AP-01,Cisco Catalyst 9136 (5 GHz),80.0,svc-wlan,athletics,
+ath-wlan-02,AP-02,Cisco Catalyst 9136 (5 GHz),80.0,svc-wlan,athletics,
+ath-wlan-03,AP-03,Ruckus R750 (5 GHz),80.0,svc-wlan,athletics,
 ath-ph-01,PHO-01,Pocket Wizard MultiMAX II,0.1,svc-photo,athletics,
 ath-ph-02,PHO-02,Pocket Wizard MultiMAX II,0.1,svc-photo,athletics,
+ath-ph-03,PHO-03,Pocket Wizard Plus X,0.1,svc-photo,athletics,
+ath-ph-04,PHO-04,Pocket Wizard Plus X,0.1,svc-photo,athletics,
 ath-cp-ph-01,PHO-PKG1,Pocket Wizard MultiMAX II,0.1,svc-photo,athletics,comp-ath-photo-01
 ath-cp-ap-01,AP-PKG1,Cisco Meraki MR36 (5 GHz),80.0,svc-wlan,athletics,comp-ath-photo-01
+ath-pr-mic-01,MIC-PR1,Sony UWP-D21 (press pool),0.2,svc-wmic,athletics,comp-ath-press-01
+ath-pr-ph-01,PHO-PR1,Pocket Wizard Plus X (press),0.1,svc-photo,athletics,comp-ath-press-01
+ath-pr-com-01,COM-PR1,Kenwood TK-3601D,0.2,svc-intercom,athletics,comp-ath-press-01
+ath-fd-pmr-01,PMR-FD1,Motorola DP4801e (field),0.2,svc-plmr,athletics,comp-ath-field-01
+ath-fd-tel-01,TEL-FD1,Omega Timing Sensor (field),0.025,svc-telem,athletics,comp-ath-field-01
+ath-fd-cam-01,CAM-FD1,Vislink HCAM-S (sideline),8.0,svc-cam,athletics,comp-ath-field-01
 ibc-mic-01,MIC-01,Shure Axient Digital AXT200,0.2,svc-wmic,ibc-media,
 ibc-mic-02,MIC-02,Sony DWX Series (UHF),0.2,svc-wmic,ibc-media,
+ibc-mic-03,MIC-03,Sennheiser EW-DX (UHF),0.2,svc-wmic,ibc-media,
+ibc-mic-04,MIC-04,Shure Axient Digital AXT200,0.2,svc-wmic,ibc-media,
+ibc-mic-05,MIC-05,Sennheiser Digital 6000,0.2,svc-wmic,ibc-media,
 ibc-iem-01,IEM-01,Shure PSM900,0.2,svc-iem,ibc-media,
+ibc-iem-02,IEM-02,Shure PSM1000,0.2,svc-iem,ibc-media,
+ibc-iem-03,IEM-03,Sennheiser SR 2050 IEM,0.2,svc-iem,ibc-media,
 ibc-com-01,COM-01,Riedel Artist 32 (PLMR),0.2,svc-intercom,ibc-media,
+ibc-com-02,COM-02,Riedel Bolero (belt pack),0.2,svc-intercom,ibc-media,
+ibc-com-03,COM-03,Clear-Com FreeSpeak Edge,0.2,svc-intercom,ibc-media,
+ibc-com-04,COM-04,Clear-Com RS-702A,0.2,svc-intercom,ibc-media,
 ibc-pmr-01,PMR-01,Motorola MOTOTRBO SL300,0.2,svc-plmr,ibc-media,
+ibc-pmr-02,PMR-02,Kenwood NX-5400B,0.2,svc-plmr,ibc-media,
+ibc-pmr-03,PMR-03,Motorola DP4401e,0.2,svc-plmr,ibc-media,
 ibc-tel-01,TEL-01,RF Camera Control Head,0.025,svc-telem,ibc-media,
+ibc-tel-02,TEL-02,Omega Timing Transponder,0.025,svc-telem,ibc-media,
 ibc-cam-01,CAM-01,Grass Valley LDX 135 (Exlink),8.0,svc-cam,ibc-media,
 ibc-sat-01,SAT-01,Comtech SNG Uplink Terminal,3.0,svc-earth,ibc-media,
 ibc-sat-02,SAT-02,Globecomm Transportable VSAT,3.0,svc-earth,ibc-media,
+ibc-sat-03,SAT-03,Comtech SNG Uplink Terminal,3.0,svc-earth,ibc-media,
 ibc-mwl-01,MWL-01,Nokia Wavence (Studio Link),28.0,svc-mmlink,ibc-media,
 ibc-ptp-01,PTP-01,Ericsson MINI-LINK 6352,28.0,svc-ptp,ibc-media,
+ibc-ptp-02,PTP-02,Ericsson MINI-LINK 6352,28.0,svc-ptp,ibc-media,
 ibc-wlan-01,AP-01,Cisco Catalyst 9136 (5 GHz),80.0,svc-wlan,ibc-media,
 ibc-wlan-02,AP-02,Ruckus R750 (5 GHz),80.0,svc-wlan,ibc-media,
+ibc-wlan-03,AP-03,Cisco Catalyst 9136 (5 GHz),80.0,svc-wlan,ibc-media,
+ibc-wlan-04,AP-04,Ruckus R750 (5 GHz),80.0,svc-wlan,ibc-media,
 ibc-ph-01,PHO-01,Pocket Wizard MultiMAX II,0.1,svc-photo,ibc-media,
+ibc-ph-02,PHO-02,Pocket Wizard Plus X,0.1,svc-photo,ibc-media,
 ibc-fm-01,FM-01,LP-100 Low Power FM Transmitter,0.2,svc-other,ibc-media,
 ibc-rp-mic-01,MIC-REP1,Sennheiser EW-DX (UHF),0.2,svc-wmic,ibc-media,comp-ibc-rep-01
 ibc-rp-iem-01,IEM-REP1,Shure PSM300,0.2,svc-iem,ibc-media,comp-ibc-rep-01
 ibc-rp-pmr-01,PMR-REP1,Kenwood NX-5400B,0.2,svc-plmr,ibc-media,comp-ibc-rep-01
+ibc-lv-mic-01,MIC-LV1,Shure Axient (live shot),0.2,svc-wmic,ibc-media,comp-ibc-live-01
+ibc-lv-iem-01,IEM-LV1,Shure PSM1000 (live),0.2,svc-iem,ibc-media,comp-ibc-live-01
+ibc-lv-cam-01,CAM-LV1,Vislink HCAM (ENG),8.0,svc-cam,ibc-media,comp-ibc-live-01
+ibc-sb-mic-01,MIC-SB1,Neumann KMS 105 (wireless),0.2,svc-wmic,ibc-media,comp-ibc-studio-b-01
+ibc-sb-mic-02,MIC-SB2,Shure Beta 87C (wireless),0.2,svc-wmic,ibc-media,comp-ibc-studio-b-01
+ibc-sb-iem-01,IEM-SB1,Sennheiser EK 2000 IEM,0.2,svc-iem,ibc-media,comp-ibc-studio-b-01
+ibc-sb-com-01,COM-SB1,Riedel Bolero (Studio B),0.2,svc-intercom,ibc-media,comp-ibc-studio-b-01

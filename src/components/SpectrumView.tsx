@@ -17,24 +17,10 @@ interface Props {
   onReserveRequest: (bandId: string, startMHz: number, endMHz: number) => void;
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div style={{
-      backgroundColor: '#ffffff', border: '1px solid #e2e8f0',
-      borderRadius: '8px', padding: '10px 18px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-    }}>
-      <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ color: accent ? '#2563eb' : '#1e293b', fontSize: '20px', fontWeight: '700', marginTop: '2px' }}>{value}</div>
-    </div>
-  );
-}
-
 export function SpectrumView({
   bands, services, selectedServiceId, selectedVenueId, allRequests, allocations, reservations,
   dragPreview, onDeallocate, onRemoveReservation, onRegisterStrip, onRegisterGrid, onReserveRequest,
 }: Props) {
-  // Determine which bands to show based on service filter
   const visibleBands = selectedServiceId === 'all'
     ? bands
     : (() => {
@@ -42,14 +28,7 @@ export function SpectrumView({
         return svc ? bands.filter(b => svc.bandIds.includes(b.id)) : bands;
       })();
 
-  // Each venue has its own independent spectrum plan
   const venueAllocations = allocations.filter(a => a.venueId === selectedVenueId);
-
-  // Stats: total spectrum from visible bands; used from this venue's allocations in those bands
-  const visibleBandIds = new Set(visibleBands.map(b => b.id));
-  const totalBW = visibleBands.reduce((s, b) => s + (b.endMHz - b.startMHz), 0);
-  const usedBW = venueAllocations.filter(a => visibleBandIds.has(a.bandId)).reduce((s, a) => s + (a.endMHz - a.startMHz), 0);
-  const utilizationPct = totalBW > 0 ? Math.round((usedBW / totalBW) * 100) : 0;
 
   const activeService = selectedServiceId !== 'all'
     ? services.find(s => s.id === selectedServiceId) ?? null
@@ -72,16 +51,8 @@ export function SpectrumView({
   );
 
   return (
-    <div style={{ padding: '24px', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
-        <Stat label="Total Spectrum" value={`${totalBW.toFixed(1)} MHz`} />
-        <Stat label="Allocated" value={`${usedBW.toFixed(2)} MHz`} />
-        <Stat label="Free" value={`${(totalBW - usedBW).toFixed(2)} MHz`} />
-        <Stat label="Utilization" value={`${utilizationPct}%`} accent />
-      </div>
-
+    <div style={{ padding: '20px 24px', backgroundColor: '#f8fafc', minWidth: 'max-content' }}>
       {activeService ? (
-        /* ── Filtered: single service ── */
         <div>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '10px',
@@ -107,7 +78,6 @@ export function SpectrumView({
           {visibleBands.map(bandRow)}
         </div>
       ) : (
-        /* ── All services: flat band list ── */
         visibleBands.map(bandRow)
       )}
     </div>
