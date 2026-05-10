@@ -5,7 +5,7 @@ import type { Allocation, BandGridParams, DragPreview, FrequencyBand, FrequencyR
 const CELL_MIN_PX = 12;   // minimum cell width — pixel floor
 const CELL_MAX_HEIGHT = 48;
 const CELL_GAP = 1;
-const MAX_CELLS = 512;    // display-resolution cap for very fine-grained bands
+const MAX_ROWS = 10;      // maximum grid rows per band — bounds height for very dense bands
 
 function fmtMHz(mhz: number): string {
   if (mhz >= 3000) {
@@ -61,18 +61,22 @@ export function BandRow({
   const [reserveSelection, setReserveSelection] = useState<{ startMHz: number; endMHz: number } | null>(null);
 
   // ── Grid geometry ─────────────────────────────────────────────────────────
-  // numCells = one cell per channel (channelMHz), capped for display performance.
-  // numCols = pack as many columns as fit at minimum cell size → fewest rows → shortest page.
+  // rawCells = exact channel count from channelMHz (one cell = one channel slot).
+  // rawCols  = how many columns fit at the minimum cell size across the full strip width.
+  // numCols  = min(rawCells, rawCols) — never more columns than there are channels.
+  // numCells = min(rawCells, numCols × MAX_ROWS) — bound height for very dense bands
+  //            while still showing channelMHz resolution for bands that fit within MAX_ROWS.
   // cellWidthPx = stripWidth / numCols  (≥ CELL_MIN_PX, scales up to fill full width).
   const bandRange = band.endMHz - band.startMHz;
   const rawCells = Math.max(1, Math.round(bandRange / (band.channelMHz ?? 0.00625)));
-  const numCells = Math.min(rawCells, MAX_CELLS);
+  const rawCols  = Math.max(1, Math.floor(stripWidth / CELL_MIN_PX));
+  const numCols  = Math.min(rawCells, rawCols);
+  const numCells = Math.min(rawCells, numCols * MAX_ROWS);
   const displayChannelMHz = bandRange / numCells;
 
-  const numCols = Math.min(numCells, Math.max(1, Math.floor(stripWidth / CELL_MIN_PX)));
-  const cellWidthPx = stripWidth / numCols;           // fills width; always ≥ CELL_MIN_PX
+  const cellWidthPx  = stripWidth / numCols;          // fills width; always ≥ CELL_MIN_PX
   const cellHeightPx = Math.min(cellWidthPx, CELL_MAX_HEIGHT);
-  const numRows = Math.ceil(numCells / numCols);
+  const numRows      = Math.ceil(numCells / numCols);
 
   // Stable refs so event-handler closures never stale
   const numColsRef = useRef(numCols);
